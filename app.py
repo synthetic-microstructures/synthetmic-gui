@@ -1,28 +1,46 @@
+import io
+import os
+import tempfile
+import zipfile
 from datetime import datetime
 
 import faicons as fa
 import numpy as np
 import pandas as pd
+from matplotlib import colormaps
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
+from shiny.types import FileInfo
 from shiny_validate import InputValidator, check
 
 import shared.controls as ct
 from shared import utils, views
 
+# TODO: update help?
+# TODO: put restriction on the number of grains; you dont want the algorithm to run forever
+
 side_bar = ui.sidebar(
+    views.how_text(),
     views.group_ui_elements(
-        views.create_dim_selection(id="dim"),
-        ui.output_ui(id="domain_input"),
+        views.create_selection(
+            id="seeds_init",
+            label="Choose how seeds are initialized",
+            choices=[i for i in ct.SeedInitializer],
+            selected=ct.SeedInitializer.RANDOM,
+        ),
+        ui.output_ui("seeds_input"),
         ui.input_switch("periodic", "Periodic", False),
-        title="Domain",
-        help_text=views.domain_help_text(),
+        title="Seeds",
+        help_text=views.seeds_help_text(),
     ),
     views.group_ui_elements(
-        views.create_numeric_input(
-            ["n_grains", "grain_ratio", "volume_ratio"],
-            ["Total grains", "Grain ratio", "Volume ratio"],
-            [1000, 1, 1],
+        views.create_selection(
+            id="phase",
+            label="Choose a phase",
+            choices=[p for p in ct.Phase],
+            selected=ct.Phase.SINGLE,
         ),
+        ui.output_ui("grain_vol_input"),
+        ui.output_text("volume_percentage_text"),
         title="Grains",
         help_text=views.grains_help_text(),
     ),
@@ -35,19 +53,43 @@ side_bar = ui.sidebar(
         title="Algorithm",
         help_text=views.algo_help_text(),
     ),
+    views.group_ui_elements(
+        views.create_selection(
+            id="colorby",
+            label="Choose how to color the microstructure",
+            choices=[c for c in ct.Colorby],
+            selected=ct.Colorby.FITTED_VOLUMES,
+        ),
+        views.create_selection(
+            id="colormap",
+            label="Choose or search a colormap to use",
+            choices=sorted(list(colormaps)),
+            selected="plasma",
+        ),
+        title="Visuals",
+        help_text="Configure how the microstructure cells are colored.",
+    ),
     ui.input_task_button(
         id="generate",
         label="Generate microstructure",
-        # auto_reset=False,
-        class_="btn btn-primary",
         icon=fa.icon_svg("person-running"),
+        class_="btn btn-primary",
     ),
     ui.input_dark_mode(mode="light"),
-    width=450,
+    views.feedback_text(),
+    width=570,
     id="sidebar",
 )
+
 app_ui = ui.page_sidebar(
     side_bar,
+    ui.head_content(ui.tags.link(rel="icon", type="image/png", href="favicon.ico")),
+    ui.tags.style("""
+        .popover {
+            max-width: 450px !important;
+            width: 450px !important;
+        }
+    """),
     ui.output_ui(id="main_ui"),
     title="Synthetic microstructure generator",
     fillable=True,
@@ -56,166 +98,517 @@ app_ui = ui.page_sidebar(
 
 
 def server(input: Inputs, output: Outputs, session: Session):
-    iv = InputValidator()  # FIXME: check why check.gt does not work
-    iv.add_rule("length", check.compose_rules(utils.required(), utils.gt(rhs=0)))
-    iv.add_rule("breadth", check.compose_rules(utils.required(), utils.gt(rhs=0)))
-    iv.add_rule(
-        "n_grains",
-        check.compose_rules(
+    # ....................................................................
+    #  some validation rules to be reused
+    # ...................................................................
+    def req_gt(rhs: float):
+        return check.compose_rules(utils.required(), utils.gt(rhs=rhs))
+
+    def req_int_gt(rhs: float):
+        return check.compose_rules(
             utils.required(),
             utils.integer(),
-            utils.gt(rhs=0),
-        ),
-    )
-    iv.add_rule("grain_ratio", check.compose_rules(utils.required(), utils.gt(rhs=0)))
-    iv.add_rule("volume_ratio", check.compose_rules(utils.required(), utils.gt(rhs=0)))
-    iv.add_rule("tol", check.compose_rules(utils.required(), utils.gt(rhs=0)))
-    iv.add_rule(
-        "damp_param",
-        check.compose_rules(
+            utils.gt(rhs=rhs),
+        )
+
+    def req_between(left: float, right: float):
+        return check.compose_rules(
             utils.required(),
-            utils.between(left=0.0, right=1.0),
-        ),
-    )
-    iv.add_rule(
-        "n_iter",
-        check.compose_rules(
-            utils.required(),
-            utils.integer(),
-            utils.gt(rhs=0),
-        ),
-    )
+            utils.between(left=left, right=right),
+        )
 
-    @render.ui
-    def domain_input():
-        ids = ["length", "breadth"]
-        labels = [id.title() for id in ids]
-        defaults = [3.0, 3.0]
-        if input.dim() == ct.Dimension.THREE_D:
-            ids.append("height")
-            labels.append("Height")
-            defaults.append(3.0)
+    iv = InputValidator()
+    iv.add_rule("tol", req_gt(rhs=0))
+    iv.add_rule("damp_param", req_between(left=0.0, right=1.0))
+    iv.add_rule("n_iter", req_int_gt(rhs=0))
 
-        return views.create_numeric_input(ids, labels, defaults)
+    # ....................................................................
+    # reactive and and side effect calculations
+    # ...................................................................
 
-    # @render.ui
-    # def distparam_input():
-    #     if input.dist().lower() == ct.Distribution.UNIFORM:
-    #         return views.create_distparam_input("low", "high")
+    # define reactive variables for holding uploaded seeds and volumes
+    _uploaded_seeds = reactive.Value(value=None)
+    _uploaded_volumes = reactive.Value(value=None)
 
-    #     return views.create_distparam_input("mean", "std")
+    @reactive.effect
+    def _() -> None:
+        file: list[FileInfo] | None = input.uploaded_seeds()
+        if file is not None:
+            _uploaded_seeds.set(pd.read_csv(file[0]["datapath"]))
 
-    # @render.ui
-    # def ratio_input():
-    #     if input.phase().lower() == ct.Phase.SINGLE:
-    #         return ui.help_text(
-    #             "Single phase selected. All grains will have the same volume."
-    #         )
+    @reactive.effect
+    def _() -> None:
+        file: list[FileInfo] | None = input.uploaded_volumes()
 
-    #     return views.create_ratio_input("volume_ratio", "grain_ratio")
+        if file is not None:
+            _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))
 
     @reactive.calc
     @reactive.event(input.generate)
-    def _generate_diagram() -> tuple[utils.OutputData | None, str | None]:
-        if input.dim() == ct.Dimension.THREE_D:
-            iv.add_rule(
-                "height", check.compose_rules(utils.required(), utils.gt(rhs=0))
+    def _generated_diagram() -> utils.Diagram | str:
+        def add_dist_param_to_iv(dist: str, id_prefix: str, **kwargs) -> dict:
+            match dist:
+                case ct.Distribution.UNIFORM:
+                    iv.add_rule(f"{id_prefix}_low", req_gt(rhs=0))
+                    iv.add_rule(f"{id_prefix}_high", req_gt(rhs=0))
+
+                    return {
+                        k: v()
+                        for k, v in zip(
+                            ("low", "high"), kwargs.get(ct.Distribution.UNIFORM)
+                        )
+                    }
+
+                case ct.Distribution.LOGNORMAL:
+                    iv.add_rule(f"{id_prefix}_mean", req_gt(rhs=0))
+                    iv.add_rule(f"{id_prefix}_std", req_gt(rhs=0))
+
+                    return {
+                        k: v()
+                        for k, v in zip(
+                            ("mean", "std"), kwargs.get(ct.Distribution.LOGNORMAL)
+                        )
+                    }
+
+                case _:
+                    return {}
+
+        state_vars = {}
+
+        # deal with the seeds
+        if input.seeds_init() == ct.SeedInitializer.RANDOM:
+            iv.add_rule("length", req_gt(rhs=0))
+            iv.add_rule("breadth", req_gt(rhs=0))
+            iv.add_rule("random_state", utils.integer(allow_none=True))
+
+            dim_specs = [input.length(), input.breadth()]
+            if input.dim() == ct.Dimension.THREE_D:
+                iv.add_rule("height", req_gt(rhs=0))
+                dim_specs.append(input.height())
+
+            state_vars["dim_specs"] = dim_specs
+            state_vars["domain_vol"] = np.prod(dim_specs)
+
+        elif input.seeds_init() == ct.SeedInitializer.UPLOAD:
+            if _uploaded_seeds() is None:
+                return "Seeds not uploaded. Upload seeds and try again."
+
+            # validate the seeds
+            val_out = utils.validate_df(
+                _uploaded_seeds(),
+                expected_colnames=list(utils.COORDINATES)[: _uploaded_seeds().shape[1]],
+                expected_dim=None,
+                expected_type="float",
+                bound=None,
+            )
+            if isinstance(val_out, str):
+                return val_out
+
+            # add domain and seeds to state_vars since they have been uploaded
+            seeds = _uploaded_seeds()
+            domain = np.array(
+                [[seeds[c].min(), seeds[c].max()] for c in seeds.columns]
+            )  # grab the min and max of each coordinate as domain
+
+            state_vars["domain_vol"] = np.prod(domain[:, 1] - domain[:, 0])
+            state_vars["seeds"] = seeds.values  # get the underlying numpy array
+            state_vars["domain"] = domain
+
+        match input.phase():
+            case ct.Phase.SINGLE:
+                iv.add_rule("single_phase_n_grains", req_int_gt(rhs=0))
+
+                kwargs = add_dist_param_to_iv(
+                    input.single_phase_dist(),
+                    "single_phase",
+                    **dict(
+                        zip(
+                            [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
+                            [
+                                (input.single_phase_low, input.single_phase_high),
+                                (input.single_phase_std, input.single_phase_std),
+                            ],
+                        )
+                    ),
+                )
+
+                iv.enable()
+                if iv.is_valid():
+                    volumes = utils.sample_single_phase_vols(
+                        input.single_phase_dist(),
+                        input.single_phase_n_grains(),
+                        state_vars.get("domain_vol"),
+                        **kwargs,
+                    )
+
+                    state_vars["n_grains"] = input.single_phase_n_grains()
+                    state_vars["volumes"] = volumes
+
+            case ct.Phase.DUAL:
+                for n in (1, 2):
+                    iv.add_rule(f"phase{n}_n_grains", req_int_gt(rhs=0))
+                    iv.add_rule(f"phase{n}_vol_ratio", req_gt(rhs=0))
+
+                phase1_kwargs = add_dist_param_to_iv(
+                    input.phase1_dist(),
+                    "phase1",
+                    **dict(
+                        zip(
+                            [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
+                            [
+                                (input.phase1_low, input.phase1_high),
+                                (input.phase1_std, input.phase1_std),
+                            ],
+                        )
+                    ),
+                )
+                phase2_kwargs = add_dist_param_to_iv(
+                    input.phase2_dist(),
+                    "phase2",
+                    **dict(
+                        zip(
+                            [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
+                            [
+                                (input.phase2_low, input.phase2_high),
+                                (input.phase2_std, input.phase2_std),
+                            ],
+                        )
+                    ),
+                )
+
+                iv.enable()
+                if iv.is_valid():
+                    volumes = utils.sample_dual_phase_vols(
+                        (input.phase1_dist(), input.phase2_dist()),
+                        (input.phase1_n_grains(), input.phase2_n_grains()),
+                        (input.phase1_vol_ratio(), input.phase2_vol_ratio()),
+                        state_vars.get("domain_vol"),
+                        (phase1_kwargs, phase2_kwargs),
+                    )
+
+                    state_vars["n_grains"] = sum(
+                        [input.phase1_n_grains(), input.phase2_n_grains()]
+                    )
+                    state_vars["volumes"] = volumes
+
+            case ct.Phase.UPLOAD:
+                if _uploaded_volumes() is None:
+                    return "Grain volumes not uploaded. Upload grain volumes and try again."
+
+                # validate the volumes
+                val_out = utils.validate_df(
+                    _uploaded_volumes(),
+                    expected_colnames=[utils.VOLUMES],
+                    expected_dim=None,
+                    expected_type="float",
+                    bound=None,
+                )
+                if isinstance(val_out, str):
+                    return val_out
+
+                volumes = _uploaded_volumes().values  # get the underlying numpy array
+                state_vars["n_grains"] = len(volumes)
+                state_vars["volumes"] = volumes
+
+            case _:
+                raise ValueError(
+                    f"Mismatch phase: {input.phase()}. Input must be one of {', '.join(ct.Phase)}."
+                )
+
+        # check the validity of user inputs
+        if not {"n_grains", "volumes"}.issubset(state_vars):
+            return "Invalid inputs. Please check all fields for the required values."
+
+        # now get the domain and seeds for random seed generation
+        if input.seeds_init() == ct.SeedInitializer.RANDOM:
+            domain, seeds = utils.sample_seeds(
+                state_vars.get("n_grains"),
+                input.random_state(),
+                *state_vars.get("dim_specs"),
             )
 
-        iv.enable()
-        if iv.is_valid():
-            args = [input.length(), input.breadth()]
-            if input.dim() == ct.Dimension.THREE_D:
-                args.append(input.height())
+            state_vars["seeds"] = seeds
+            state_vars["domain"] = domain
 
-            return utils.generate_diagram(
-                input.n_grains(),
-                input.grain_ratio(),
-                input.volume_ratio(),
-                input.tol(),
-                input.n_iter(),
-                input.damp_param(),
-                input.periodic(),
-                *args,
-            ), None
+        # finally check if volumes and seeds dim match; very important for the uploads
+        if len(state_vars.get("volumes")) != len(state_vars.get("seeds")):
+            return f"""The number of samples in seeds and grain volumes do not match:
+              len(seeds)={len(state_vars.get("seeds"))}, len(volumes)={len(state_vars.get("volumes"))}"""
 
-        return None, "Invalid inputs. Please all fields for the required values."
+        return utils.generate_diagram(
+            domain=state_vars.get("domain"),
+            seeds=state_vars.get("seeds"),
+            volumes=state_vars.get("volumes"),
+            periodic=input.periodic(),
+            tol=input.tol(),
+            n_iter=input.n_iter(),
+            damp_param=input.damp_param(),
+            colorby=input.colorby(),
+            colormap=input.colormap(),
+        )  # FIXME: ensure the right thing is returned from the algorithm; time it? Add more error reports if algorithm fails; restrict the number of grains?
+
+    # ....................................................................
+    # reactive and non-reactive uis
+    # ...................................................................
+
+    @render.ui
+    def domain_input() -> ui.Tag:
+        ids = ["length", "breadth"]
+        labels = [id.title() for id in ids]
+        defaults = [1.0, 1.0]
+        if input.dim() == ct.Dimension.THREE_D:
+            ids.append("height")
+            labels.append("Height")
+            defaults.append(20.0)
+
+        return views.create_numeric_input(ids, labels, defaults)
+
+    @render.ui
+    def dim_input() -> ui.Tag:
+        return views.create_selection(
+            id="dim",
+            label="Choose a dimension",
+            choices=[d for d in ct.Dimension],
+            selected=ct.Dimension.THREE_D,
+        )
+
+    @render.ui
+    def uploaded_seeds_summary():
+        @render.table
+        def seeds_summary_table():
+            return utils.summarize_df(_uploaded_seeds())
+
+        if _uploaded_seeds() is None:
+            return ui.help_text(
+                "No seeds uploaded yet. Information about seeds will be displayed here after upload."
+            )
+
+        return ui.output_table("seeds_summary_table")
+
+    @render.ui
+    def seeds_input() -> ui.Tag:
+        if input.seeds_init() == ct.SeedInitializer.RANDOM:
+            return ui.tags.div(
+                ui.row(
+                    ui.column(
+                        6,
+                        ui.output_ui("dim_input"),
+                    ),
+                    ui.column(
+                        6,
+                        ui.input_numeric(
+                            id="random_state", label="Seeds random state", value=None
+                        ),
+                    ),
+                ),
+                ui.output_ui("domain_input"),
+            )
+
+        return ui.tags.div(
+            views.create_upload_handler(
+                "uploaded_seeds",
+                "Uplaod seeds as a csv or txt file",
+            ),
+            ui.output_ui("uploaded_seeds_summary"),
+        )
+
+    @render.ui
+    def single_phase_dist_param() -> ui.Tag:
+        return views.create_dist_param(input.single_phase_dist(), "single_phase")
+
+    @render.ui
+    def phase1_dist_param() -> ui.Tag:
+        return views.create_dist_param(input.phase1_dist(), "phase1")
+
+    @render.ui
+    def phase2_dist_param() -> ui.Tag:
+        return views.create_dist_param(input.phase2_dist(), "phase2")
+
+    @render.ui
+    def uploaded_volumes_summary():
+        @render.table
+        def volumes_summary_table():
+            return utils.summarize_df(_uploaded_volumes())
+
+        if _uploaded_volumes() is None:
+            return ui.help_text(
+                "No volumes uploaded yet. Information about volumes will be displayed here after upload."
+            )
+
+        return ui.output_table("volumes_summary_table")
+
+    @render.ui
+    def grain_vol_input() -> ui.Tag:
+        def phase_input(n: int) -> ui.Tag:
+            return ui.row(
+                ui.column(
+                    4,
+                    views.create_dist_selection(
+                        id=f"phase{n}_dist", label=f"Phase {n} volume distribution"
+                    ),
+                ),
+                ui.column(
+                    4,
+                    ui.input_numeric(
+                        id=f"phase{n}_n_grains",
+                        label=f"Phase {n} number of grains",
+                        value=500,
+                    ),
+                ),
+                ui.column(
+                    4,
+                    ui.input_numeric(
+                        id=f"phase{n}_vol_ratio",
+                        label=f"Phase {n} volume ratio",
+                        value=1,
+                    ),
+                ),
+            )
+
+        if input.phase() == ct.Phase.SINGLE:
+            ins = [
+                ui.row(
+                    ui.column(
+                        6,
+                        ui.input_numeric(
+                            id="single_phase_n_grains",
+                            label="Number of grains",
+                            value=1000,
+                        ),
+                    ),
+                    ui.column(6, views.create_dist_selection(id="single_phase_dist")),
+                ),
+                ui.output_ui("single_phase_dist_param"),
+            ]
+
+            return ui.tags.div(*ins)
+
+        elif input.phase() == ct.Phase.UPLOAD:
+            return ui.tags.div(
+                views.create_upload_handler(
+                    "uploaded_volumes",
+                    "Uplaod volumes as a csv or txt file",
+                ),
+                ui.output_ui("uploaded_volumes_summary"),
+            )
+
+        ins = []
+        for n in (1, 2):
+            ins.extend((phase_input(n), ui.output_ui(f"phase{n}_dist_param")))
+            if n == 1:
+                ins.append(ui.hr())
+
+        return ui.tags.div(*ins)
+
+    @render.text
+    def volume_percentage_text() -> str | None:
+        if any(
+            [
+                input.phase1_vol_ratio() is None,
+                input.phase2_vol_ratio() is None,
+                input.phase() == ct.Phase.UPLOAD,
+            ]
+        ):
+            return
+
+        if input.phase() == ct.Phase.SINGLE:
+            return "Single phase volume percentage is 100% of the domain volume."
+
+        phase1_vol_percent = (
+            input.phase1_vol_ratio()
+            * 100
+            / (input.phase1_vol_ratio() + input.phase2_vol_ratio())
+        )
+
+        return (
+            f"Phase 1 volume percentage is {phase1_vol_percent:.2f}%; Phase 2 volume percentage is {100.0 - phase1_vol_percent:.2f}% "
+            "of the domain volume."
+        )
 
     @render.ui
     def display_diagram():
-        diagram, _ = _generate_diagram()
-        return ui.HTML(diagram.diagram_htmls.get(input.slice().lower()))
-
-    # @render.plot
-    # def vol_dist_plot():
-    #     fig, ax = plt.subplots()
-    #     diagram, _ = _generate_diagram()
-
-    #     for vol, label in zip(
-    #         (diagram.actual_volumes, diagram.fitted_volumes),
-    #         ("Actual", "Fitted"),
-    #     ):
-    #         plt.hist(vol, label=label)
-    #         # sns.kdeplot(data=vol, fill=True, alpha=0.5, ax=ax, label=label)
-
-    #     ax.set_xlabel("Volumes")
-    #     ax.legend(frameon=False)
-
-    #     return fig
-    # @render_widget
-    # def vol_dist_plot():
-    #     diagram, _ = _generate_diagram()
-    #     df = pd.DataFrame()
-    #     df["Volumes"] = (
-    #         diagram.actual_volumes.tolist() + diagram.fitted_volumes.tolist()
-    #     )
-    #     df["Type"] = ["Actual"] * len(diagram.actual_volumes) + ["Fitted"] * len(
-    #         diagram.fitted_volumes
-    #     )
-
-    #     fig = px.histogram(
-    #         df,
-    #         x="Volumes",
-    #         color="Type",
-    #         # histnorm="probability density",  # Normalize for better comparison
-    #         opacity=0.7,
-    #         barmode="overlay",
-    #     )
-    #     return fig
-
-    @render.download(
-        filename=lambda: f"centroid-volume-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.csv",
-        media_type="text/csv",
-    )
-    def download_centroid_vol():
-        diagram, _ = _generate_diagram()
-
-        columns = ["x-coordinate", "y-coordinate"]
-        if diagram.centroids.shape[1] == 3:
-            columns.append("z-coordinate")
-        columns.extend(["actual volumes", "fitted volumes"])
-
-        df = pd.DataFrame(
-            data=np.column_stack(
-                (diagram.centroids, diagram.actual_volumes, diagram.fitted_volumes)
-            ),
-            columns=columns,
+        diagram = _generated_diagram()
+        return ui.HTML(
+            diagram.plotters.get(input.slice()).export_html(filename=None).read()
         )
 
-        yield df.to_csv().encode("utf-8")
+    @render.plot
+    def vol_dist_plot():
+        diagram = _generated_diagram()
+
+        return utils.plot_volume_dist(diagram)
+
+    @render.download(
+        filename=lambda: f"full-diagram-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.{input.fig_extension()}",
+    )
+    def download_full_diagram():
+        diagram = _generated_diagram()
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=f".{input.fig_extension()}", delete=True
+        ) as tmp_file:
+            filename = tmp_file.name
+
+            match input.fig_extension():
+                case (
+                    ct.FigureExtension.PDF
+                    | ct.FigureExtension.EPS
+                    | ct.FigureExtension.SVG
+                ):
+                    diagram.plotters.get(utils.Slice.FULL).save_graphic(filename)
+
+                case ct.FigureExtension.HTML:
+                    diagram.plotters.get(utils.Slice.FULL).export_html(filename)
+
+                case ct.FigureExtension.VTK:
+                    diagram.mesh.save(filename, binary=False)
+
+                case _:
+                    os.unlink(
+                        filename
+                    )  # ensure the file is deleted incase of wrong input
+                    raise ValueError(
+                        f"Mismatch extension: {input.fig_extension()}. Input must be one of {', '.join(ct.FigureExtension)}."
+                    )
+
+            with open(filename, "rb") as f:
+                content = f.read()
+
+        yield content
+
+    @render.download(
+        filename=lambda: f"diagram-property-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
+        media_type="application/zip",
+    )
+    def download_diagram_property():
+        diagram = _generated_diagram()
+        diagram_prop = utils.extract_property_as_df(diagram)
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for fname, df in diagram_prop.items():
+                buffer = io.BytesIO()
+                df.to_csv(buffer, index=False)
+                buffer.seek(0)
+                zipf.writestr(f"{fname}.{input.prop_extension()}", buffer.getvalue())
+                buffer.close()
+
+        zip_buffer.seek(0)
+
+        yield zip_buffer.getvalue()
 
     @render.ui
-    def main_ui():
-        diagram, error = _generate_diagram()
+    def main_ui() -> ui.Tag:
+        diagram = _generated_diagram()
 
-        if error is not None:
-            ui.notification_show(error, type="error")
+        if isinstance(diagram, str):
+            ui.notification_show(diagram, type="error", duration=5)
             return
 
         diagram_ctrl = ui.input_radio_buttons(
             id="slice",
             label="Choose a diagram to view",
-            choices=[s.capitalize() for s in utils.Slice],
+            choices=[s for s in ct.Slice],
             inline=False,
         )
 
@@ -223,9 +616,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             *[
                 ui.value_box(
                     title=t,
-                    value=f"{v:.4f}",
+                    value=utils.format_to_standard_form(v, 2)
+                    if t
+                    in (
+                        "Max percentage error",
+                        "Mean percentage error",
+                    )
+                    else f"{v:.2f}",
                     full_screen=False,
                     showcase=fa.icon_svg("magnifying-glass"),
+                    height="160px",
                 )
                 for t, v in zip(
                     [
@@ -244,17 +644,41 @@ def server(input: Inputs, output: Outputs, session: Session):
             ]
         )
 
+        fig_extension = views.create_selection(
+            id="fig_extension",
+            label="Download full diagram as",
+            choices=[e for e in ct.FigureExtension],
+            selected=ct.FigureExtension.HTML,
+        )
+        prop_extension = views.create_selection(
+            id="prop_extension",
+            label="Download diagram properties as",
+            choices=[e for e in ct.PropertyExtension],
+            selected=ct.PropertyExtension.CSV,
+        )
+
         return ui.tags.div(
             metrics,
             ui.row(
                 ui.column(
                     3,
-                    diagram_ctrl,
-                    ui.download_button(
-                        id="download_centroid_vol",
-                        label="Down centroids and volumes",
-                        icon=fa.icon_svg("download"),
-                        class_="btn btn-primary",
+                    ui.card(
+                        diagram_ctrl,
+                        fig_extension,
+                        ui.download_button(
+                            id="download_full_diagram",
+                            label="Download full diagram",
+                            icon=fa.icon_svg("download"),
+                            class_="btn btn-primary",
+                        ),
+                        prop_extension,
+                        ui.download_button(
+                            id="download_diagram_property",
+                            label="Download diagram properties",
+                            icon=fa.icon_svg("download"),
+                            class_="btn btn-primary",
+                        ),
+                        style="height: 600px; overflow: hidden;",
                     ),
                 ),
                 ui.column(
@@ -263,13 +687,12 @@ def server(input: Inputs, output: Outputs, session: Session):
                         ui.output_ui(
                             "display_diagram",
                         ),
-                        # height="600px",
-                        style="height: 500px; overflow: hidden;",
+                        style="height: 600px; overflow: hidden;",
                         full_screen=True,
                     ),
                 ),
             ),
-            # ui.card(output_widget("vol_dist_plot")),
+            ui.card(ui.output_plot("vol_dist_plot")),
         )
 
 

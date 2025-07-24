@@ -683,19 +683,6 @@ wheels = [
 ]
 
 [[package]]
-name = "plotly"
-version = "6.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "narwhals" },
-    { name = "packaging" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/5c/0efc297df362b88b74957a230af61cd6929f531f72f48063e8408702ffba/plotly-6.2.0.tar.gz", hash = "sha256:9dfa23c328000f16c928beb68927444c1ab9eae837d1fe648dbcda5360c7953d", size = 6801941, upload-time = "2025-06-26T16:20:45.765Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/20/f2b7ac96a91cc5f70d81320adad24cc41bf52013508d649b1481db225780/plotly-6.2.0-py3-none-any.whl", hash = "sha256:32c444d4c940887219cb80738317040363deefdfee4f354498cc0b6dab8978bd", size = 9635469, upload-time = "2025-06-26T16:20:40.76Z" },
-]
-
-[[package]]
 name = "prompt-toolkit"
 version = "3.0.51"
 source = { registry = "https://pypi.org/simple" }
@@ -950,7 +937,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "faicons" },
     { name = "numpy" },
-    { name = "plotly" },
     { name = "seaborn" },
     { name = "shiny" },
     { name = "shiny-validate" },
@@ -961,7 +947,6 @@ dependencies = [
 requires-dist = [
     { name = "faicons", specifier = ">=0.2.2" },
     { name = "numpy", specifier = ">=2.3.1" },
-    { name = "plotly", specifier = ">=6.2.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shiny", specifier = ">=1.4.0" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
