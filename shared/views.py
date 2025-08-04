@@ -54,37 +54,19 @@ def create_numeric_input(
     return ui.row(*cols)
 
 
-def seeds_help_text() -> ui.Tag:
+def box_help_text() -> ui.HTML:
     return ui.markdown(
-        f"""
-        ### Seeds
-
-        Seeds are the initial locations or positions of the Laguerre cells.
-        These are needed for the generator to run.
-
-        There are two ways to initialize seeds: **random** and **upload**.
-
-        The random initialization will generate seeds (uniformly) randomly in the
-        specified domain ([0, Length), [0, Breadth), [0, Height)). **Length**, **Breadth**,
-        and **Height** are, respectively, the length, breadth, and height of the box that defines the domain.
-        If you want the seeds to be reproducible, give a positive integer in the **Seeds random state**
-        box.
-
-        If seeds are uploaded, then these will be used in generating the miscrostructure instead.
-        The csv or txt file **must only contain** column names as {list(COORDINATES)[:2]} for 2D case and
-        {list(COORDINATES)} for 3D case. The columns are the coordinates of the seeds. All
-        values must be float.
+        """
+        **Length**, **Breadth**, and **Height** are, respectively, the length, breadth, and height of the box. 
 
         Turn on **Periodic** to ensure periodicity of the domain in all directions.
-        """
+       """
     )
 
 
-def grains_help_text() -> ui.Tag:
+def grains_help_text() -> ui.HTML:
     return ui.markdown(
         f"""
-        ### Grains
-
         Here, you control the number and distribution of grains, as well as the
         distribution of volumes.
 
@@ -119,15 +101,29 @@ def grains_help_text() -> ui.Tag:
     )
 
 
-def algo_help_text() -> ui.Tag:
+def algo_help_text() -> ui.HTML:
     return ui.markdown(
-        """
-        **Tolerance**: relative percentage error for volumes.
+        f"""
+        Seeds are the initial locations or positions of the Laguerre cells.
+        These are needed for the generator to run.
 
-        **Iterations**: number of iterations of Lloyd's algorithm (move each seed to the
+        There are two ways to initialize seeds: **random** and **upload**.
+
+        The random initialization will generate seeds (uniformly) randomly in the
+        domain ([0, Length), [0, Breadth), [0, Height)). If you want the seeds to be reproducible,
+        give a positive integer in the **Seeds random state** box.
+
+        If seeds are uploaded, then these will be used in generating the miscrostructure instead.
+        The csv or txt file **must only contain** column names as {list(COORDINATES)[:2]} for 2D case and
+        {list(COORDINATES)} for 3D case. The columns are the coordinates of the seeds. All
+        values must be float.
+        
+        **Volume tolerance**: relative percentage error for volumes.
+
+        **Lloyd iterations**: number of iterations of Lloyd's algorithm (move each seed to the
         centroid of its cell).
 
-        **Damp param**: the damping parametr of the damped Lloyd step; value must be between
+        **Damp parameter**: the damping parametr of the damped Lloyd step; value must be between
         0 and 1 (inclusive).
         """
     )
@@ -147,39 +143,56 @@ def feedback_text() -> ui.Tag:
     )
 
 
+def about_text() -> ui.HTML:
+    return ui.markdown(
+        """
+        #### About
+
+        **Synthetic Miscrostructure Generator** is a web app for generating 2D and 3D synthetic polycrystalline microstructures using Laguerre tessellations.
+        It uses the fast algorithms (developed in this [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053))
+        for generating grains of prescribed volumes using optimal transport theory. It is built on
+        top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) package which is the Python implementation of the fast algorithms.
+        """
+    )
+
+
+def usage_text() -> ui.HTML:
+    return ui.markdown(
+        """
+        #### Usage
+
+        Using the app is extremely easy. It can be done in **5 steps**:
+        1. Specify both the space and box dimension. You can optionally choose whether the underlying domain should be periodic in all directions.
+        1. Specify the number of grains and how target volumes will be generated. We support single and dual phase volumes specification. You
+        can also upload your custom target volumes instead.
+        1. Specify how generated cells will be colored. We've got a range of different color options!
+        1. Click on **Generate miscrostructure** button to generate synthetic miscrostructure.
+        1. Click on any of the **download buttons** to either download the generated diagram (in different formats!) or the diagram properties (like centroids, vertices, etc; also in
+        differnt formats!).
+
+        That is it!
+
+        Enjoy generating microstructures!
+        """
+    )
+
+
 def how_text() -> ui.Tag:
     return ui.accordion(
         ui.accordion_panel(
             "Need help? Read how to use Synthetic miscrostructure generator",
-            ui.markdown(
-                """
-                **Synthetic miscrostructure generator** is a web app for generating 2D and 3D synthetic polycrystalline microstructures using Laguerre tessellations.
-                It uses the fast algorithms (developed in this [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053))
-                for generating grains of prescribed volumes using optimal transport theory. It is built on
-                top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) package which is the Python implementation of the fast algorithms.
-
-                Using the app is extremely easy. It can be done in **5 steps**:
-
-                - **Configure how the seeds are generated**, this are initial positions of the cells; we support both 2D and 3D.
-                - **Choose a phase and volume distribution**, either single or dual phase, we get you covered! We support
-                choosing from a range of volume distribution: constant, uniform, and lognormal. You can also upload your custom volumes!
-                - **Configure the fast algorithm**, this gives you control over the accuracy of the generator, how many iterations to run, etc.
-                - Click on **Generate miscrostructure** button to generate synthetic miscrostructure.
-                - Click on any of the **download buttons** to either download the generated diagram (in different formats!) or the diagram properties (like centroids and volume; also in
-                differnt formats!).
-
-                That is it!
-
-                Enjoy generating microstructures!
-                """
-            ),
+            about_text(),
+            ui.hr(),
+            usage_text(),
             icon=fa.icon_svg("lightbulb", fill="#0073CF"),
         ),
         open=False,
     )
 
 
-def group_ui_elements(*args, title: ui.Tag, help_text: ui.Tag) -> ui.Tag:
+def group_ui_elements(
+    *args, title: ui.Tag | str, help_text: ui.Tag | str | ui.HTML
+) -> ui.Tag:
     qn_circle_fill = ui.HTML(
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#0073CF" class="bi bi-question-circle-fill mb-1" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.496 6.033h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286a.237.237 0 0 0 .241.247zm2.325 6.443c.61 0 1.029-.394 1.029-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94 0 .533.425.927 1.01.927z"/></svg>'
     )
@@ -241,4 +254,22 @@ def create_upload_handler(id: str, label: str) -> ui.Tag:
         label,
         accept=[".csv", ".txt"],
         multiple=False,
+    )
+
+
+def info_modal() -> None:
+    ui.modal_show(
+        ui.modal(
+            ui.markdown("### Synthetic Microstructure Generator"),
+            ui.hr(),
+            about_text(),
+            ui.hr(),
+            usage_text(),
+            size="l",
+            easy_close=True,
+            footer=ui.modal_button(
+                "Close",
+                class_="btn btn-primary",
+            ),
+        )
     )

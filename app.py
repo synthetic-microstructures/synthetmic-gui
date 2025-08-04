@@ -15,22 +15,14 @@ from shiny_validate import InputValidator, check
 import shared.controls as ct
 from shared import utils, views
 
-# TODO: update help?
-# TODO: put restriction on the number of grains; you dont want the algorithm to run forever
-
 side_bar = ui.sidebar(
     views.how_text(),
     views.group_ui_elements(
-        views.create_selection(
-            id="seeds_init",
-            label="Choose how seeds are initialized",
-            choices=[i for i in ct.SeedInitializer],
-            selected=ct.SeedInitializer.RANDOM,
-        ),
-        ui.output_ui("seeds_input"),
+        ui.output_ui("space_dim"),
+        ui.output_ui("box_dim"),
         ui.input_switch("periodic", "Periodic", False),
-        title="Seeds",
-        help_text=views.seeds_help_text(),
+        title="Box dimension",
+        help_text=views.box_help_text(),
     ),
     views.group_ui_elements(
         views.create_selection(
@@ -45,9 +37,16 @@ side_bar = ui.sidebar(
         help_text=views.grains_help_text(),
     ),
     views.group_ui_elements(
+        views.create_selection(
+            id="seeds_init",
+            label="Choose how seeds are initialized",
+            choices=[i for i in ct.SeedInitializer],
+            selected=ct.SeedInitializer.RANDOM,
+        ),
+        ui.output_ui("seeds_input"),
         views.create_numeric_input(
             ["tol", "n_iter", "damp_param"],
-            ["Tolerance", "Iterations", "Damp param"],
+            ["Volume tolerance", "Lloyd iterations", "Damp param"],
             [0.1, 5, 1.0],
         ),
         title="Algorithm",
@@ -65,6 +64,15 @@ side_bar = ui.sidebar(
             label="Choose or search a colormap to use",
             choices=sorted(list(colormaps)),
             selected="plasma",
+        ),
+        ui.input_switch("addpositions", "Add final seed positions to diagram", False),
+        ui.input_slider(
+            id="opacity",
+            label="Diagram opacity",
+            min=0.0,
+            max=1.0,
+            value=1.0,
+            ticks=True,
         ),
         title="Visuals",
         help_text="Configure how the microstructure cells are colored.",
@@ -84,14 +92,20 @@ side_bar = ui.sidebar(
 app_ui = ui.page_sidebar(
     side_bar,
     ui.head_content(ui.tags.link(rel="icon", type="image/png", href="favicon.ico")),
-    ui.tags.style("""
+    ui.tags.style(
+        """
         .popover {
-            max-width: 450px !important;
-            width: 450px !important;
+            max-width: 400px !important;
+            width: 400px !important;
         }
-    """),
+        .modal-dialog {
+                margin-top: 20px !important;
+                overflow-y: hidden !important;
+        }
+        """
+    ),
     ui.output_ui(id="main_ui"),
-    title="Synthetic microstructure generator",
+    title="SynthetMic: Synthetic Microstructure Generator",
     fillable=True,
     fillable_mobile=True,
 )
@@ -118,6 +132,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
     iv = InputValidator()
+    iv.add_rule("length", req_gt(rhs=0))
+    iv.add_rule("breadth", req_gt(rhs=0))
     iv.add_rule("tol", req_gt(rhs=0))
     iv.add_rule("damp_param", req_between(left=0.0, right=1.0))
     iv.add_rule("n_iter", req_int_gt(rhs=0))
@@ -142,6 +158,8 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         if file is not None:
             _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))
+
+    views.info_modal()
 
     @reactive.calc
     @reactive.event(input.generate)
@@ -175,44 +193,15 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         state_vars = {}
 
-        # deal with the seeds
-        if input.seeds_init() == ct.SeedInitializer.RANDOM:
-            iv.add_rule("length", req_gt(rhs=0))
-            iv.add_rule("breadth", req_gt(rhs=0))
-            iv.add_rule("random_state", utils.integer(allow_none=True))
+        box_dim = [input.length(), input.breadth()]
+        if input.dim() == ct.Dimension.THREE_D:
+            iv.add_rule("height", req_gt(rhs=0))
+            box_dim.append(input.height())
 
-            dim_specs = [input.length(), input.breadth()]
-            if input.dim() == ct.Dimension.THREE_D:
-                iv.add_rule("height", req_gt(rhs=0))
-                dim_specs.append(input.height())
-
-            state_vars["dim_specs"] = dim_specs
-            state_vars["domain_vol"] = np.prod(dim_specs)
-
-        elif input.seeds_init() == ct.SeedInitializer.UPLOAD:
-            if _uploaded_seeds() is None:
-                return "Seeds not uploaded. Upload seeds and try again."
-
-            # validate the seeds
-            val_out = utils.validate_df(
-                _uploaded_seeds(),
-                expected_colnames=list(utils.COORDINATES)[: _uploaded_seeds().shape[1]],
-                expected_dim=None,
-                expected_type="float",
-                bound=None,
-            )
-            if isinstance(val_out, str):
-                return val_out
-
-            # add domain and seeds to state_vars since they have been uploaded
-            seeds = _uploaded_seeds()
-            domain = np.array(
-                [[seeds[c].min(), seeds[c].max()] for c in seeds.columns]
-            )  # grab the min and max of each coordinate as domain
-
-            state_vars["domain_vol"] = np.prod(domain[:, 1] - domain[:, 0])
-            state_vars["seeds"] = seeds.values  # get the underlying numpy array
-            state_vars["domain"] = domain
+        state_vars["space_dim"] = len(box_dim)
+        state_vars["box_dim"] = box_dim
+        state_vars["domain_vol"] = np.prod(box_dim)
+        state_vars["domain"] = np.array([[0, d] for d in box_dim])
 
         match input.phase():
             case ct.Phase.SINGLE:
@@ -292,43 +281,87 @@ def server(input: Inputs, output: Outputs, session: Session):
                     state_vars["volumes"] = volumes
 
             case ct.Phase.UPLOAD:
-                if _uploaded_volumes() is None:
-                    return "Grain volumes not uploaded. Upload grain volumes and try again."
+                iv.enable()
+                if iv.is_valid():
+                    if _uploaded_volumes() is None:
+                        return "Grain volumes not uploaded. Upload grain volumes and try again."
 
-                # validate the volumes
-                val_out = utils.validate_df(
-                    _uploaded_volumes(),
-                    expected_colnames=[utils.VOLUMES],
-                    expected_dim=None,
-                    expected_type="float",
-                    bound=None,
-                )
-                if isinstance(val_out, str):
-                    return val_out
+                    # validate the volumes
+                    val_out = utils.validate_df(
+                        _uploaded_volumes(),
+                        expected_colnames=[utils.VOLUMES],
+                        expected_dim=None,
+                        expected_type="float",
+                        file="volumes",
+                        bounds=None,
+                    )
+                    if isinstance(val_out, str):
+                        return val_out
 
-                volumes = _uploaded_volumes().values  # get the underlying numpy array
-                state_vars["n_grains"] = len(volumes)
-                state_vars["volumes"] = volumes
+                    # check if domain volume is close to the sum of the uploaded volumes.
+                    VOL_DIFF_TOL = 1e-16
+                    volumes = _uploaded_volumes()[
+                        utils.VOLUMES
+                    ].values  # get the underlying numpy array
+                    diff = abs(volumes.sum() - state_vars.get("domain_vol"))
+                    if diff > VOL_DIFF_TOL:
+                        return f"""Mismatch total volume: domain volume is {state_vars.get("domain_vol")} whereas total uploaded volume is {volumes.sum()};
+                        a difference of {diff}. Volume difference must be at most {VOL_DIFF_TOL:.2e}."""
+
+                    state_vars["n_grains"] = len(volumes)
+                    state_vars["volumes"] = volumes
 
             case _:
-                raise ValueError(
-                    f"Mismatch phase: {input.phase()}. Input must be one of {', '.join(ct.Phase)}."
-                )
+                return f"Mismatch phase: {input.phase()}. Input must be one of {', '.join(ct.Phase)}."
 
         # check the validity of user inputs
         if not {"n_grains", "volumes"}.issubset(state_vars):
             return "Invalid inputs. Please check all fields for the required values."
 
-        # now get the domain and seeds for random seed generation
-        if input.seeds_init() == ct.SeedInitializer.RANDOM:
-            domain, seeds = utils.sample_seeds(
-                state_vars.get("n_grains"),
-                input.random_state(),
-                *state_vars.get("dim_specs"),
-            )
+        # deal with the seeds
+        match input.seeds_init():
+            case ct.SeedInitializer.RANDOM:
+                iv.add_rule("random_state", utils.integer(allow_none=True))
 
-            state_vars["seeds"] = seeds
-            state_vars["domain"] = domain
+                _, seeds = utils.sample_seeds(
+                    state_vars.get("n_grains"),
+                    input.random_state(),
+                    *state_vars.get("box_dim"),
+                )
+                state_vars["seeds"] = seeds
+
+            case ct.SeedInitializer.UPLOAD:
+                if _uploaded_seeds() is None:
+                    return "Seeds not uploaded. Upload seeds and try again."
+
+                # validate the seeds
+                val_out = utils.validate_df(
+                    _uploaded_seeds(),
+                    expected_colnames=list(utils.COORDINATES)[
+                        : state_vars.get("space_dim")
+                    ],
+                    expected_dim=(
+                        state_vars.get("n_grains"),
+                        state_vars.get("space_dim"),
+                    ),
+                    expected_type="float",
+                    file="seeds",
+                    bounds=dict(
+                        zip(
+                            utils.COORDINATES[: state_vars.get("space_dim")],
+                            state_vars.get("domain"),
+                        )
+                    ),
+                )
+                if isinstance(val_out, str):
+                    return val_out
+
+                # add domain and seeds to state_vars since they have been uploaded
+                seeds = _uploaded_seeds()
+                state_vars["seeds"] = seeds.values  # get the underlying numpy array
+
+            case _:
+                return f"Mismatch seed initializer: {input.seeds_init()}. Input must be one of {', '.join(ct.SeedInitializer)}."
 
         # finally check if volumes and seeds dim match; very important for the uploads
         if len(state_vars.get("volumes")) != len(state_vars.get("seeds")):
@@ -345,26 +378,28 @@ def server(input: Inputs, output: Outputs, session: Session):
             damp_param=input.damp_param(),
             colorby=input.colorby(),
             colormap=input.colormap(),
-        )  # FIXME: ensure the right thing is returned from the algorithm; time it? Add more error reports if algorithm fails; restrict the number of grains?
+            add_final_seed_positions=input.addpositions(),
+            opacity=input.opacity(),
+        )
 
     # ....................................................................
     # reactive and non-reactive uis
     # ...................................................................
 
     @render.ui
-    def domain_input() -> ui.Tag:
+    def box_dim() -> ui.Tag:
         ids = ["length", "breadth"]
         labels = [id.title() for id in ids]
         defaults = [1.0, 1.0]
         if input.dim() == ct.Dimension.THREE_D:
             ids.append("height")
             labels.append("Height")
-            defaults.append(20.0)
+            defaults.append(1.0)
 
         return views.create_numeric_input(ids, labels, defaults)
 
     @render.ui
-    def dim_input() -> ui.Tag:
+    def space_dim() -> ui.Tag:
         return views.create_selection(
             id="dim",
             label="Choose a dimension",
@@ -389,19 +424,12 @@ def server(input: Inputs, output: Outputs, session: Session):
     def seeds_input() -> ui.Tag:
         if input.seeds_init() == ct.SeedInitializer.RANDOM:
             return ui.tags.div(
-                ui.row(
-                    ui.column(
-                        6,
-                        ui.output_ui("dim_input"),
-                    ),
-                    ui.column(
-                        6,
-                        ui.input_numeric(
-                            id="random_state", label="Seeds random state", value=None
-                        ),
-                    ),
+                ui.input_numeric(
+                    id="random_state", label="Seeds random state", value=None
                 ),
-                ui.output_ui("domain_input"),
+                ui.help_text(
+                    "Seeds will be randomly generated in the specified box above."
+                ),
             )
 
         return ui.tags.div(
@@ -602,7 +630,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         diagram = _generated_diagram()
 
         if isinstance(diagram, str):
-            ui.notification_show(diagram, type="error", duration=5)
+            ui.notification_show(diagram, type="error", duration=None)
             return
 
         diagram_ctrl = ui.input_radio_buttons(
@@ -631,13 +659,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                     [
                         "Max percentage error",
                         "Mean percentage error",
-                        "Total actual volume",
-                        "Total fitted volume",
+                        "Sum of target volumes",
+                        "Sum of fitted volumes",
                     ],
                     [
                         diagram.max_percentage_error,
                         diagram.mean_percentage_error,
-                        diagram.actual_volumes.sum(),
+                        diagram.target_volumes.sum(),
                         diagram.fitted_volumes.sum(),
                     ],
                 )

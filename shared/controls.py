@@ -15,7 +15,7 @@ class Distribution(StrEnum):
 class Phase(StrEnum):
     SINGLE = auto()
     DUAL = auto()
-    UPLOAD = "upload volumes"
+    UPLOAD = "upload target volumes"
 
 
 class FigureExtension(StrEnum):
@@ -40,9 +40,9 @@ class Slice(StrEnum):
 
 
 class Colorby(StrEnum):
-    ACTUAL_VOLUMES = "actual volumes"
+    TARGET_VOLUMES = "target volumes"
     FITTED_VOLUMES = "fitted volumes"
-    VOLUME_ERRORS = "volume erros"
+    VOLUME_ERRORS = "volume errors"
     RANDOM = auto()
 
 

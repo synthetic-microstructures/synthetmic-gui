@@ -21,7 +21,7 @@ class Diagram:
     centroids: np.ndarray
     vertices: np.ndarray
     fitted_volumes: np.ndarray
-    actual_volumes: np.ndarray
+    target_volumes: np.ndarray
     weights: np.ndarray
     seeds: np.ndarray
     positions: np.ndarray
@@ -110,11 +110,10 @@ def sample_seeds(
 ) -> tuple[np.ndarray, np.ndarray]:
     np.random.seed(random_state)
 
-    dim = len(args)
     domain = np.array([[0, s] for s in args])
 
-    seeds = np.random.uniform(
-        low=domain.min(axis=1), high=domain.max(axis=1), size=(n_grains, dim)
+    seeds = np.column_stack(
+        [np.random.uniform(low=0, high=h, size=n_grains) for h in args]
     )
 
     return domain, seeds
@@ -122,29 +121,31 @@ def sample_seeds(
 
 def plot_diagram(
     generator: LaguerreDiagramGenerator,
-    actual_volumes: np.ndarray,
+    target_volumes: np.ndarray,
     colorby: str,
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
+    add_final_seed_positions: bool = False,
+    opacity: float = 1.0,
 ) -> tuple[pv.PolyData | pv.UnstructuredGrid, dict[str, pv.Plotter]]:
     mesh = generator.get_mesh()
 
     match colorby:
-        case Colorby.ACTUAL_VOLUMES:
-            colorby_values = actual_volumes
+        case Colorby.TARGET_VOLUMES:
+            colorby_values = target_volumes
 
         case Colorby.FITTED_VOLUMES:
             colorby_values = generator.get_fitted_volumes()
 
         case Colorby.VOLUME_ERRORS:
             colorby_values = (
-                np.abs(generator.get_fitted_volumes() - actual_volumes)
+                np.abs(generator.get_fitted_volumes() - target_volumes)
                 * 100
-                / actual_volumes
+                / target_volumes
             )
 
         case Colorby.RANDOM:
-            colorby_values = np.random.rand(actual_volumes.shape[0])
+            colorby_values = np.random.rand(target_volumes.shape[0])
 
         case _:
             raise ValueError(
@@ -176,7 +177,25 @@ def plot_diagram(
             show_scalar_bar=False,
             lighting=False,
             cmap=colormap,
+            opacity=opacity,
         )
+
+        if s == Slice.FULL and add_final_seed_positions:
+            final_seed_positions = generator.get_positions()
+            n_samples, space_dim = final_seed_positions.shape
+            if space_dim == 2:
+                final_seed_positions = np.column_stack(
+                    (final_seed_positions, np.zeros(n_samples))
+                )
+
+            # final_seed_positions = m.extract_surface().cell_centers(vertex=True)
+            # TODO: the seeds do not work correctly with 3D case for now unless you use the above commented line.
+            pl.add_points(
+                points=final_seed_positions,
+                render_points_as_spheres=True,
+                color="black",
+                point_size=5,
+            )
 
         pl.show_axes()
 
@@ -195,6 +214,8 @@ def generate_diagram(
     damp_param: float,
     colorby: str,
     colormap: str,
+    opacity: float,
+    add_final_seed_positions: bool,
 ) -> Diagram:
     generator = LaguerreDiagramGenerator(
         tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=False
@@ -209,9 +230,11 @@ def generate_diagram(
 
     mesh, plotters = plot_diagram(
         generator=generator,
-        actual_volumes=volumes,
+        target_volumes=volumes,
         colorby=colorby,
         colormap=colormap,
+        opacity=opacity,
+        add_final_seed_positions=add_final_seed_positions,
     )
 
     return Diagram(
@@ -221,7 +244,7 @@ def generate_diagram(
         mean_percentage_error=generator.mean_percentage_error_,
         centroids=generator.get_centroids(),  # FIXME: for now; this is not the same as the pyvista mesh
         vertices=generator.get_vertices(),
-        actual_volumes=volumes,
+        target_volumes=volumes,
         fitted_volumes=generator.get_fitted_volumes(),
         weights=generator.get_weights(),
         domain=domain,
@@ -264,10 +287,8 @@ def between(
 
         return left <= x <= right
 
-    return (
-        lambda x: None
-        if (rule(x) or x is None)
-        else f"Must be between {left} and {right}"
+    return lambda x: (
+        None if (rule(x) or x is None) else f"Must be between {left} and {right}"
     )
 
 
@@ -294,8 +315,8 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
 
     for p, d in zip(
         (
-            "seeds",
-            "positions",
+            "seeds_initial",
+            "seeds_final",
             "centroids",
             "vertices",
         ),
@@ -306,10 +327,10 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
     for p, d in zip(
         (
             "weights",
-            "actual_volumes",
+            "target_volumes",
             "fitted_volumes",
         ),
-        (diagram.weights, diagram.actual_volumes, diagram.fitted_volumes),
+        (diagram.weights, diagram.target_volumes, diagram.fitted_volumes),
     ):
         property_dict[p] = pd.DataFrame(
             data=d, columns=["weights"] if p == "weights" else ["volumes"]
@@ -324,15 +345,19 @@ def plot_volume_dist(diagram: Diagram) -> Figure:
     for i in range(3):
         if i in (0, 2):
             sns.histplot(
-                data=diagram.fitted_volumes
-                if i == 0
-                else np.abs(diagram.actual_volumes - diagram.fitted_volumes),
+                data=(
+                    diagram.fitted_volumes
+                    if i == 0
+                    else np.abs(diagram.target_volumes - diagram.fitted_volumes)
+                    * 100
+                    / diagram.target_volumes
+                ),
                 kde=True,
                 fill=True,
                 ax=ax[i],
             )
             ax[i].set_title("Histogram plot")
-            ax[i].set_xlabel("Fitted volumes" if i == 0 else "Volume errors")
+            ax[i].set_xlabel("Fitted volumes" if i == 0 else "Volume errors (%)")
 
         else:
             sns.histplot(
@@ -353,29 +378,41 @@ def validate_df(
     df: pd.DataFrame,
     expected_colnames: list[str],
     expected_type: str,
-    expected_dim: int | None = None,
-    bound: tuple[float, float] | None = None,
+    file: str,
+    expected_dim: tuple[int, int] | None = None,
+    bounds: dict[str, Iterable[float]] | None = None,
 ) -> str | None:
     df_colnames = df.columns.to_list()
 
     if df_colnames != expected_colnames:
-        return f"Column mismatch error: expected {expected_colnames} but got {df_colnames}."
+        return f"Column mismatch error in the uploaded {file} file: expected {expected_colnames} but got {df_colnames}. Please try again."
 
     if expected_dim is not None:
-        if len(df_colnames) != expected_dim:
-            return f"Dimension mismatch error: expected dimension {expected_dim} but got {len(df_colnames)}."
+        if df.shape != expected_dim:
+            return f"Dimension mismatch error in the uploaded {file} file: expected dimension {expected_dim} but got {df.shape}. Please try again."
 
     df_dtypes = df.dtypes.values.tolist()
     if not all(t == expected_type for t in df_dtypes):
-        return f"Data type mismatch error: expected all values to be of {expected_type} but got {df_dtypes}."
+        return f"Data type mismatch error in the uploaded {file} file: expected all values to be of {expected_type} but got {df_dtypes}. Please try again."
 
-    if bound is not None:
-        df_min = df.values.min()
-        df_max = df.values.max()
+    if bounds is not None:
+        msg = []
+        for c, b in bounds.items():
+            c_min = df[c].values.min()
+            c_max = df[c].values.max()
 
-        if not all(bound[0] <= val <= bound[1] for val in [df_min, df_max]):
-            return f"""Values bound error: expected minimum of all values to be in [{bound[0]}, {bound[1]}];
-            but values have min and max as {df_min} and {df_max} respectively."""
+            if not all(b[0] <= val <= b[1] for val in [c_min, c_max]):
+                msg.append(
+                    f"""expected {c}-coordinate values to be in [{b[0]:.2f}, {b[1]:.2f}]
+                but values are in [{c_min:.2f}, {c_max:.2f}]"""
+                )
+
+        if msg:
+            return (
+                f"Value bound error in the uploaded {file} file: "
+                + "; ".join(msg)
+                + ". Please try again."
+            )
 
     return None
 
