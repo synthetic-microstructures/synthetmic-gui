@@ -1,5 +1,6 @@
 import io
 import os
+import pathlib
 import tempfile
 import zipfile
 from datetime import datetime
@@ -15,7 +16,7 @@ from shiny_validate import InputValidator, check
 import shared.controls as ct
 from shared import utils, views
 
-side_bar = ui.sidebar(
+sidebar = ui.sidebar(
     views.how_text(),
     views.group_ui_elements(
         ui.output_ui("space_dim"),
@@ -52,31 +53,6 @@ side_bar = ui.sidebar(
         title="Algorithm",
         help_text=views.algo_help_text(),
     ),
-    views.group_ui_elements(
-        views.create_selection(
-            id="colorby",
-            label="Choose how to color the microstructure",
-            choices=[c for c in ct.Colorby],
-            selected=ct.Colorby.FITTED_VOLUMES,
-        ),
-        views.create_selection(
-            id="colormap",
-            label="Choose or search a colormap to use",
-            choices=sorted(list(colormaps)),
-            selected="plasma",
-        ),
-        ui.input_switch("addpositions", "Add final seed positions to diagram", False),
-        ui.input_slider(
-            id="opacity",
-            label="Diagram opacity",
-            min=0.0,
-            max=1.0,
-            value=1.0,
-            ticks=True,
-        ),
-        title="Visuals",
-        help_text="Configure how the microstructure cells are colored.",
-    ),
     ui.input_task_button(
         id="generate",
         label="Generate microstructure",
@@ -85,15 +61,17 @@ side_bar = ui.sidebar(
     ),
     ui.input_dark_mode(mode="light"),
     views.feedback_text(),
-    width=570,
+    width=560,
     id="sidebar",
 )
 
-app_ui = ui.page_sidebar(
-    side_bar,
+app_ui = ui.page_navbar(
+    ui.nav_panel(ct.Tab.GEN_MIC, ui.output_ui(id="gen_mic_tab")),
+    ui.nav_panel(ct.Tab.METRICS_AND_PLOTS, ui.output_ui(id="metrics_and_plots_tab")),
     ui.head_content(ui.tags.link(rel="icon", type="image/png", href="favicon.ico")),
-    ui.tags.style(
-        """
+    ui.head_content(
+        ui.tags.style(
+            """
         .popover {
             max-width: 400px !important;
             width: 400px !important;
@@ -101,11 +79,15 @@ app_ui = ui.page_sidebar(
         .modal-dialog {
                 margin-top: 20px !important;
                 overflow-y: hidden !important;
+        } 
+        .navbar-nav {
+            justify-content: center !important;
         }
         """
+        )
     ),
-    ui.output_ui(id="main_ui"),
-    title="SynthetMic: Synthetic Microstructure Generator",
+    sidebar=sidebar,
+    title="SynthetMic-GUI",
     fillable=True,
     fillable_mobile=True,
 )
@@ -376,11 +358,22 @@ def server(input: Inputs, output: Outputs, session: Session):
             tol=input.tol(),
             n_iter=input.n_iter(),
             damp_param=input.damp_param(),
+        )
+
+    @reactive.calc()
+    def _generated_plotters():
+        diagram = _generated_diagram()
+
+        mesh, plotters = utils.plot_diagram(
+            generator=diagram.generator,
+            target_volumes=diagram.target_volumes,
             colorby=input.colorby(),
             colormap=input.colormap(),
             add_final_seed_positions=input.addpositions(),
             opacity=input.opacity(),
         )
+
+        return mesh, plotters
 
     # ....................................................................
     # reactive and non-reactive uis
@@ -555,10 +548,9 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     @render.ui
     def display_diagram():
-        diagram = _generated_diagram()
-        return ui.HTML(
-            diagram.plotters.get(input.slice()).export_html(filename=None).read()
-        )
+        # diagram = _generated_diagram()
+        _, plotters = _generated_plotters()
+        return ui.HTML(plotters.get(input.slice()).export_html(filename=None).read())
 
     @render.plot
     def vol_dist_plot():
@@ -570,7 +562,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         filename=lambda: f"full-diagram-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.{input.fig_extension()}",
     )
     def download_full_diagram():
-        diagram = _generated_diagram()
+        # diagram = _generated_diagram()
+        mesh, plotters = _generated_plotters()
 
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=f".{input.fig_extension()}", delete=True
@@ -583,13 +576,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                     | ct.FigureExtension.EPS
                     | ct.FigureExtension.SVG
                 ):
-                    diagram.plotters.get(utils.Slice.FULL).save_graphic(filename)
+                    plotters.get(utils.Slice.FULL).save_graphic(filename)
 
                 case ct.FigureExtension.HTML:
-                    diagram.plotters.get(utils.Slice.FULL).export_html(filename)
+                    plotters.get(utils.Slice.FULL).export_html(filename)
 
                 case ct.FigureExtension.VTK:
-                    diagram.mesh.save(filename, binary=False)
+                    mesh.save(filename, binary=False)
 
                 case _:
                     os.unlink(
@@ -625,19 +618,18 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         yield zip_buffer.getvalue()
 
-    @render.ui
-    def main_ui() -> ui.Tag:
+    def get_tab(tab: str) -> ui.Tag:
         diagram = _generated_diagram()
 
         if isinstance(diagram, str):
             ui.notification_show(diagram, type="error", duration=None)
             return
 
-        diagram_ctrl = ui.input_radio_buttons(
+        diagram_ctrl = views.create_selection(
             id="slice",
             label="Choose a diagram to view",
             choices=[s for s in ct.Slice],
-            inline=False,
+            selected=ct.Slice.FULL,
         )
 
         metrics = ui.layout_column_wrap(
@@ -672,56 +664,99 @@ def server(input: Inputs, output: Outputs, session: Session):
             ]
         )
 
-        fig_extension = views.create_selection(
-            id="fig_extension",
-            label="Download full diagram as",
-            choices=[e for e in ct.FigureExtension],
-            selected=ct.FigureExtension.HTML,
-        )
-        prop_extension = views.create_selection(
-            id="prop_extension",
-            label="Download diagram properties as",
-            choices=[e for e in ct.PropertyExtension],
-            selected=ct.PropertyExtension.CSV,
-        )
-
-        return ui.tags.div(
-            metrics,
-            ui.row(
-                ui.column(
-                    3,
+        match tab:
+            case ct.Tab.GEN_MIC:
+                return ui.tags.div(
+                    ui.row(
+                        ui.column(
+                            3,
+                            ui.card(
+                                diagram_ctrl,
+                                views.create_selection(
+                                    id="colorby",
+                                    label="Color by",
+                                    choices=[c for c in ct.Colorby],
+                                    selected=ct.Colorby.FITTED_VOLUMES,
+                                ),
+                                views.create_selection(
+                                    id="colormap",
+                                    label="Choose a colormap",
+                                    choices=sorted(list(colormaps)),
+                                    selected="plasma",
+                                ),
+                                ui.input_switch(
+                                    "addpositions",
+                                    "Add final seed positions",
+                                    False,
+                                ),
+                                ui.input_slider(
+                                    id="opacity",
+                                    label="Diagram opacity",
+                                    min=0.0,
+                                    max=1.0,
+                                    value=1.0,
+                                    ticks=True,
+                                ),
+                                views.create_selection(
+                                    id="fig_extension",
+                                    label="Download full diagram as",
+                                    choices=[e for e in ct.FigureExtension],
+                                    selected=ct.FigureExtension.HTML,
+                                ),
+                                ui.download_button(
+                                    id="download_full_diagram",
+                                    label="Download full diagram",
+                                    icon=fa.icon_svg("download"),
+                                    class_="btn btn-primary",
+                                ),
+                                views.create_selection(
+                                    id="prop_extension",
+                                    label="Download properties as",
+                                    choices=[e for e in ct.PropertyExtension],
+                                    selected=ct.PropertyExtension.CSV,
+                                ),
+                                ui.download_button(
+                                    id="download_diagram_property",
+                                    label="Download properties",
+                                    icon=fa.icon_svg("download"),
+                                    class_="btn btn-primary",
+                                ),
+                                style="height: 800px; overflow: hidden;",
+                            ),
+                        ),
+                        ui.column(
+                            9,
+                            ui.card(
+                                ui.output_ui(
+                                    "display_diagram",
+                                ),
+                                style="height: 800px; overflow: hidden;",
+                                full_screen=True,
+                            ),
+                        ),
+                    ),
+                )
+            case ct.Tab.METRICS_AND_PLOTS:
+                return ui.tags.div(
+                    metrics,
                     ui.card(
-                        diagram_ctrl,
-                        fig_extension,
-                        ui.download_button(
-                            id="download_full_diagram",
-                            label="Download full diagram",
-                            icon=fa.icon_svg("download"),
-                            class_="btn btn-primary",
-                        ),
-                        prop_extension,
-                        ui.download_button(
-                            id="download_diagram_property",
-                            label="Download diagram properties",
-                            icon=fa.icon_svg("download"),
-                            class_="btn btn-primary",
-                        ),
+                        ui.output_plot("vol_dist_plot"),
                         style="height: 600px; overflow: hidden;",
                     ),
-                ),
-                ui.column(
-                    9,
-                    ui.card(
-                        ui.output_ui(
-                            "display_diagram",
-                        ),
-                        style="height: 600px; overflow: hidden;",
-                        full_screen=True,
-                    ),
-                ),
-            ),
-            ui.card(ui.output_plot("vol_dist_plot")),
-        )
+                )
+
+            case _:
+                raise ValueError(
+                    f"Invalid tab: {tab}; tab must be one of [{', '.join(ct.Tab)}]"
+                )
+
+    @render.ui
+    def gen_mic_tab() -> ui.Tag:
+        return get_tab(tab=ct.Tab.GEN_MIC)
+
+    @render.ui
+    def metrics_and_plots_tab() -> ui.Tag:
+        return get_tab(tab=ct.Tab.METRICS_AND_PLOTS)
 
 
-app = App(app_ui, server)
+app = App(app_ui, server, static_assets={"/": f"{pathlib.Path(__file__).parent}/www"})

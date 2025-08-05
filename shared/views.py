@@ -148,7 +148,7 @@ def about_text() -> ui.HTML:
         """
         #### About
 
-        **Synthetic Miscrostructure Generator** is a web app for generating 2D and 3D synthetic polycrystalline microstructures using Laguerre tessellations.
+        **SynthetMic-GUI** is a web app for generating 2D and 3D synthetic polycrystalline microstructures using Laguerre tessellations.
         It uses the fast algorithms (developed in this [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053))
         for generating grains of prescribed volumes using optimal transport theory. It is built on
         top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) package which is the Python implementation of the fast algorithms.
@@ -180,7 +180,7 @@ def usage_text() -> ui.HTML:
 def how_text() -> ui.Tag:
     return ui.accordion(
         ui.accordion_panel(
-            "Need help? Read how to use Synthetic miscrostructure generator",
+            "Need help? Read how to use SynthetMic-GUI",
             about_text(),
             ui.hr(),
             usage_text(),
@@ -260,7 +260,7 @@ def create_upload_handler(id: str, label: str) -> ui.Tag:
 def info_modal() -> None:
     ui.modal_show(
         ui.modal(
-            ui.markdown("### Synthetic Microstructure Generator"),
+            ui.markdown("### SynthetMic-GUI"),
             ui.hr(),
             about_text(),
             ui.hr(),

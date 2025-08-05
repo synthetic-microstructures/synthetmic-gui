@@ -14,8 +14,7 @@ from shared.controls import Colorby, Distribution, Slice
 
 @dataclass(frozen=True)
 class Diagram:
-    mesh: pv.PolyData | pv.UnstructuredGrid
-    plotters: dict[str, pv.Plotter]
+    generator: LaguerreDiagramGenerator
     max_percentage_error: float
     mean_percentage_error: float
     centroids: np.ndarray
@@ -180,16 +179,22 @@ def plot_diagram(
             opacity=opacity,
         )
 
+        final_seed_positions = generator.get_positions()
+        n_samples, space_dim = final_seed_positions.shape
+
+        if space_dim == 2:
+            pl.camera_position = "xy"
+
+        elif space_dim == 3:
+            pl.camera_position = "yz"
+            pl.camera.azimuth = 45
+
         if s == Slice.FULL and add_final_seed_positions:
-            final_seed_positions = generator.get_positions()
-            n_samples, space_dim = final_seed_positions.shape
             if space_dim == 2:
                 final_seed_positions = np.column_stack(
                     (final_seed_positions, np.zeros(n_samples))
                 )
 
-            # final_seed_positions = m.extract_surface().cell_centers(vertex=True)
-            # TODO: the seeds do not work correctly with 3D case for now unless you use the above commented line.
             pl.add_points(
                 points=final_seed_positions,
                 render_points_as_spheres=True,
@@ -212,10 +217,6 @@ def generate_diagram(
     tol: float,
     n_iter: int,
     damp_param: float,
-    colorby: str,
-    colormap: str,
-    opacity: float,
-    add_final_seed_positions: bool,
 ) -> Diagram:
     generator = LaguerreDiagramGenerator(
         tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=False
@@ -228,21 +229,11 @@ def generate_diagram(
         init_weights=None,
     )
 
-    mesh, plotters = plot_diagram(
-        generator=generator,
-        target_volumes=volumes,
-        colorby=colorby,
-        colormap=colormap,
-        opacity=opacity,
-        add_final_seed_positions=add_final_seed_positions,
-    )
-
     return Diagram(
-        mesh=mesh,
-        plotters=plotters,
+        generator=generator,
         max_percentage_error=generator.max_percentage_error_,
         mean_percentage_error=generator.mean_percentage_error_,
-        centroids=generator.get_centroids(),  # FIXME: for now; this is not the same as the pyvista mesh
+        centroids=generator.get_centroids(),
         vertices=generator.get_vertices(),
         target_volumes=volumes,
         fitted_volumes=generator.get_fitted_volumes(),
@@ -340,36 +331,54 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
 
 
 def plot_volume_dist(diagram: Diagram) -> Figure:
-    fig, ax = plt.subplots(1, 3)
+    fig = plt.figure()
 
-    for i in range(3):
+    errors = (
+        np.abs(diagram.target_volumes - diagram.fitted_volumes)
+        * 100
+        / diagram.target_volumes
+    )
+    color = "#0073CF"
+
+    for i in range(4):
+        ax = fig.add_subplot(2, 2, i + 1)
+
         if i in (0, 2):
             sns.histplot(
-                data=(
-                    diagram.fitted_volumes
-                    if i == 0
-                    else np.abs(diagram.target_volumes - diagram.fitted_volumes)
-                    * 100
-                    / diagram.target_volumes
-                ),
+                data=(diagram.fitted_volumes if i == 0 else errors),
                 kde=True,
                 fill=True,
-                ax=ax[i],
+                ax=ax,
+                color=color,
             )
-            ax[i].set_title("Histogram plot")
-            ax[i].set_xlabel("Fitted volumes" if i == 0 else "Volume errors (%)")
+            ax.set_title("Histogram plot")
+            ax.set_xlabel("Fitted volumes" if i == 0 else "Volume errors (%)")
 
-        else:
+        elif i == 1:
             sns.histplot(
                 data=diagram.fitted_volumes,
                 cumulative=True,
                 stat="density",
                 element="step",
                 fill=False,
-                ax=ax[i],
+                ax=ax,
+                color=color,
             )
-            ax[i].set_title("Cummulative distribution")
-            ax[i].set_xlabel("Fitted volumes")
+            ax.set_title("Cummulative distribution")
+            ax.set_xlabel("Fitted volumes")
+
+        else:
+            marker_style = dict(
+                alpha=0.7, marker="o", s=40, facecolor="white", edgecolor=color
+            )
+            ax.scatter(
+                np.arange(errors.shape[0]),
+                errors,
+                **marker_style,
+            )
+            ax.set_title("Scatter plot of percentage errors")
+            ax.set_xlabel("Error index")
+            ax.set_ylabel("Volume errors (%)")
 
     return fig
 

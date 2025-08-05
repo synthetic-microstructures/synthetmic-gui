@@ -1,6 +1,16 @@
 from enum import StrEnum, auto
 
 
+class DocSize(StrEnum):
+    BEAMER = auto()
+    THESIS = auto()
+
+
+class Tab(StrEnum):
+    GEN_MIC = "Generated microstructure"
+    METRICS_AND_PLOTS = "Metrics and plots"
+
+
 class Dimension(StrEnum):
     TWO_D = "2D"
     THREE_D = "3D"
