@@ -1,0 +1,12 @@
+{
+    "https://api.shinyapps.io": {
+        "server_url": "https://api.shinyapps.io",
+        "filename": "/home/s2228293/Documents/impact_eng/synthetmic-gui",
+        "app_url": "https://rasheed-ibraheem.shinyapps.io/synthetmic-gui1/",
+        "app_id": "15174501",
+        "app_guid": null,
+        "title": "synthetmic-gui",
+        "app_mode": "python-shiny",
+        "app_store_version": 1
+    }
+}
