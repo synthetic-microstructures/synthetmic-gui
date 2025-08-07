@@ -1,0 +1,8 @@
+faicons>=0.2.2
+numpy>=2.3.1
+seaborn>=0.13.2
+shiny>=1.4.0
+shiny-validate>=0.1.3
+shinywidgets>=0.6.2
+synthetmic>=0.1.1
+
