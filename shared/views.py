@@ -161,14 +161,13 @@ def usage_text() -> ui.HTML:
         """
         #### Usage
 
-        Using the app is extremely easy. It can be done in **5 steps**:
+        Using the app is extremely easy. It can be done in **4 steps**:
         1. Specify both the space and box dimension. You can optionally choose whether the underlying domain should be periodic in all directions.
         1. Specify the number of grains and how target volumes will be generated. We support single and dual phase volumes specification. You
         can also upload your custom target volumes instead.
-        1. Specify how generated cells will be colored. We've got a range of different color options!
         1. Click on **Generate miscrostructure** button to generate synthetic miscrostructure.
-        1. Click on any of the **download buttons** to either download the generated diagram (in different formats!) or the diagram properties (like centroids, vertices, etc; also in
-        differnt formats!).
+        1. Click on any of the **download buttons** to either download the generated diagram (in different formats!) or the diagram properties
+        (like centroids, vertices, etc; also in differnt formats!).
 
         That is it!
 

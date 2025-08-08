@@ -245,7 +245,15 @@ def generate_diagram(
 
 
 def gt(rhs: float) -> Callable[[float | None], str | None]:
-    return lambda x: f"Must be greater than {rhs}" if (x < rhs or x is None) else None
+    return lambda x: f"Must be greater than {rhs}" if (x <= rhs or x is None) else None
+
+
+def gte(rhs: float) -> Callable[[float | None], str | None]:
+    return (
+        lambda x: f"Must be greater than or equal to {rhs}"
+        if (x < rhs or x is None)
+        else None
+    )
 
 
 def required() -> Callable[[Any], str | None]:

@@ -59,3 +59,14 @@ class Colorby(StrEnum):
 class SeedInitializer(StrEnum):
     RANDOM = auto()
     UPLOAD = auto()
+
+
+PLOT_DEFAULTS = {
+    "slice": Slice.FULL,
+    "colorby": Colorby.FITTED_VOLUMES,
+    "colormap": "plasma",
+    "addpositions": False,
+    "opacity": 1.0,
+    "fig_extension": FigureExtension.HTML,
+    "prop_extension": PropertyExtension.CSV,
+}
