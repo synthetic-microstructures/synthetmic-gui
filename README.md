@@ -54,7 +54,7 @@ The following instructions use uv for setting up the app locally.
 - [S. M. Roper](https://github.com/smr29git)
 
 ### Roadmap
-- [] put restriction on the number of grains; you dont want the algorithm to run forever!
-- [] add functionality of color by: phase, texture.
-- [] allow for selective periodicity
-- [] triangulation
+- [ ] put restriction on the number of grains; you dont want the algorithm to run forever!
+- [ ] add functionality of color by: phase, texture.
+- [ ] allow for selective periodicity
+- [ ] triangulation
