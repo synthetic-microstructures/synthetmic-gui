@@ -1,14 +1,14 @@
 # SynthetMic-GUI
 ### About
-**SynthetMic-GUI** is a web app for generating 2D and 3D synthetic polycrystalline microstructures using Laguerre tessellations.
+SynthetMic-GUI is a web app for generating 2D and 3D synthetic polycrystalline microstructures using Laguerre tessellations.
 It uses the fast algorithms (developed in this [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053))
 for generating grains of prescribed volumes using optimal transport theory. It is built on
 top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) package which is the Python implementation of the fast algorithms.
 
 This app is available at this [link](link to the app).
 
-[app_ui_tab1](./assets/app_ui_tab1.png)
-[app_ui_tab2](./assets/app_ui_tab2.png)
+![app_ui_tab1](./assets/app_ui_tab1.png)
+![app_ui_tab2](./assets/app_ui_tab2.png)
 
 ### Local set up
 If you would like to build this project from source either for development purposes or for any other reason, it is recommended to install [uv](https://docs.astral.sh/uv/). This is what is adopted in this project. To install uv, follow the instructions in this [link](https://docs.astral.sh/uv/getting-started/installation/).
