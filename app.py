@@ -289,7 +289,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         return val_out
 
                     # check if domain volume is close to the sum of the uploaded volumes.
-                    VOL_DIFF_TOL = 1e-16
+                    VOL_DIFF_TOL = 1e-6
                     volumes = _uploaded_volumes()[
                         utils.VOLUMES
                     ].values  # get the underlying numpy array
