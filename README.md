@@ -58,3 +58,4 @@ The following instructions use uv for setting up the app locally.
 - [ ] add functionality of color by: phase, texture.
 - [ ] allow for selective periodicity
 - [ ] triangulation
+- [ ] add the number of vertices / volume to the metrics 
