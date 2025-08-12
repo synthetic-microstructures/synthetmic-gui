@@ -107,6 +107,13 @@ def server(input: Inputs, output: Outputs, session: Session):
             utils.gt(rhs=rhs),
         )
 
+    def req_int_gte(rhs: float):
+        return check.compose_rules(
+            utils.required(),
+            utils.integer(),
+            utils.gte(rhs=rhs),
+        )
+
     def req_between(left: float, right: float):
         return check.compose_rules(
             utils.required(),
@@ -118,7 +125,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     iv.add_rule("breadth", req_gt(rhs=0))
     iv.add_rule("tol", req_gt(rhs=0))
     iv.add_rule("damp_param", req_between(left=0.0, right=1.0))
-    iv.add_rule("n_iter", req_int_gt(rhs=0))
+    iv.add_rule("n_iter", req_int_gte(rhs=0))
 
     # ....................................................................
     # reactive and and side effect calculations
@@ -127,6 +134,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # define reactive variables for holding uploaded seeds and volumes
     _uploaded_seeds = reactive.Value(value=None)
     _uploaded_volumes = reactive.Value(value=None)
+    _generated_plotters = reactive.Value(value=None)
 
     @reactive.effect
     def _() -> None:
@@ -281,7 +289,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         return val_out
 
                     # check if domain volume is close to the sum of the uploaded volumes.
-                    VOL_DIFF_TOL = 1e-16
+                    VOL_DIFF_TOL = 1e-6
                     volumes = _uploaded_volumes()[
                         utils.VOLUMES
                     ].values  # get the underlying numpy array
@@ -360,10 +368,9 @@ def server(input: Inputs, output: Outputs, session: Session):
             damp_param=input.damp_param(),
         )
 
-    @reactive.calc()
-    def _generated_plotters():
+    @reactive.effect
+    def _():
         diagram = _generated_diagram()
-
         mesh, plotters = utils.plot_diagram(
             generator=diagram.generator,
             target_volumes=diagram.target_volumes,
@@ -373,7 +380,31 @@ def server(input: Inputs, output: Outputs, session: Session):
             opacity=input.opacity(),
         )
 
-        return mesh, plotters
+        _generated_plotters.set((mesh, plotters))
+
+        # ensure most recent plot settings are remembered
+        ui.update_select(id="slice", selected=input.slice())
+        ui.update_select(id="colorby", selected=input.colorby())
+        ui.update_select(id="colormap", selected=input.colormap())
+        ui.update_switch(id="addpositions", value=input.addpositions())
+        ui.update_slider(id="opacity", value=input.opacity())
+        ui.update_select(id="fig_extension", selected=input.fig_extension())
+        ui.update_select(id="prop_extension", selected=input.prop_extension())
+
+    @reactive.effect
+    @reactive.event(input.reset_plot_options)
+    def _():
+        ui.update_select(id="slice", selected=ct.PLOT_DEFAULTS.get("slice"))
+        ui.update_select(id="colorby", selected=ct.PLOT_DEFAULTS.get("colorby"))
+        ui.update_select(id="colormap", selected=ct.PLOT_DEFAULTS.get("colormap"))
+        ui.update_switch(id="addpositions", value=ct.PLOT_DEFAULTS.get("addpositions"))
+        ui.update_slider(id="opacity", value=ct.PLOT_DEFAULTS.get("opacity"))
+        ui.update_select(
+            id="fig_extension", selected=ct.PLOT_DEFAULTS.get("fig_extension")
+        )
+        ui.update_select(
+            id="prop_extension", selected=ct.PLOT_DEFAULTS.get("prop_extension")
+        )
 
     # ....................................................................
     # reactive and non-reactive uis
@@ -548,7 +579,6 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     @render.ui
     def display_diagram():
-        # diagram = _generated_diagram()
         _, plotters = _generated_plotters()
         return ui.HTML(plotters.get(input.slice()).export_html(filename=None).read())
 
@@ -562,7 +592,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         filename=lambda: f"full-diagram-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.{input.fig_extension()}",
     )
     def download_full_diagram():
-        # diagram = _generated_diagram()
         mesh, plotters = _generated_plotters()
 
         with tempfile.NamedTemporaryFile(
@@ -676,32 +705,32 @@ def server(input: Inputs, output: Outputs, session: Session):
                                     id="colorby",
                                     label="Color by",
                                     choices=[c for c in ct.Colorby],
-                                    selected=ct.Colorby.FITTED_VOLUMES,
+                                    selected=ct.PLOT_DEFAULTS.get("colorby"),
                                 ),
                                 views.create_selection(
                                     id="colormap",
                                     label="Choose a colormap",
                                     choices=sorted(list(colormaps)),
-                                    selected="plasma",
+                                    selected=ct.PLOT_DEFAULTS.get("colormap"),
                                 ),
                                 ui.input_switch(
                                     "addpositions",
                                     "Add final seed positions",
-                                    False,
+                                    ct.PLOT_DEFAULTS.get("addpositions"),
                                 ),
                                 ui.input_slider(
                                     id="opacity",
                                     label="Diagram opacity",
                                     min=0.0,
                                     max=1.0,
-                                    value=1.0,
+                                    value=ct.PLOT_DEFAULTS.get("opacity"),
                                     ticks=True,
                                 ),
                                 views.create_selection(
                                     id="fig_extension",
                                     label="Download full diagram as",
                                     choices=[e for e in ct.FigureExtension],
-                                    selected=ct.FigureExtension.HTML,
+                                    selected=ct.PLOT_DEFAULTS.get("fig_extension"),
                                 ),
                                 ui.download_button(
                                     id="download_full_diagram",
@@ -713,7 +742,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                                     id="prop_extension",
                                     label="Download properties as",
                                     choices=[e for e in ct.PropertyExtension],
-                                    selected=ct.PropertyExtension.CSV,
+                                    selected=ct.PLOT_DEFAULTS.get("prop_extension"),
                                 ),
                                 ui.download_button(
                                     id="download_diagram_property",
@@ -721,7 +750,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                                     icon=fa.icon_svg("download"),
                                     class_="btn btn-primary",
                                 ),
-                                style="height: 800px; overflow: hidden;",
+                                ui.input_action_button(
+                                    id="reset_plot_options",
+                                    label="Reset plot options to defaults",
+                                    icon=fa.icon_svg("gear"),
+                                    class_="btn btn-primary",
+                                ),
+                                style="height: 900px; overflow: hidden;",
                             ),
                         ),
                         ui.column(
@@ -730,7 +765,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                                 ui.output_ui(
                                     "display_diagram",
                                 ),
-                                style="height: 800px; overflow: hidden;",
+                                style="height: 900px; overflow: hidden;",
                                 full_screen=True,
                             ),
                         ),

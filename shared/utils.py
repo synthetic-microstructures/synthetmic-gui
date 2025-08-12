@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyvista as pv
-import seaborn as sns
 from matplotlib.figure import Figure
 from synthetmic import LaguerreDiagramGenerator
 
@@ -218,6 +217,9 @@ def generate_diagram(
     n_iter: int,
     damp_param: float,
 ) -> Diagram:
+    if isinstance(damp_param, int):
+        damp_param = float(damp_param)
+
     generator = LaguerreDiagramGenerator(
         tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=False
     )
@@ -245,7 +247,15 @@ def generate_diagram(
 
 
 def gt(rhs: float) -> Callable[[float | None], str | None]:
-    return lambda x: f"Must be greater than {rhs}" if (x < rhs or x is None) else None
+    return lambda x: f"Must be greater than {rhs}" if (x <= rhs or x is None) else None
+
+
+def gte(rhs: float) -> Callable[[float | None], str | None]:
+    return (
+        lambda x: f"Must be greater than or equal to {rhs}"
+        if (x < rhs or x is None)
+        else None
+    )
 
 
 def required() -> Callable[[Any], str | None]:
@@ -344,28 +354,27 @@ def plot_volume_dist(diagram: Diagram) -> Figure:
         ax = fig.add_subplot(2, 2, i + 1)
 
         if i in (0, 2):
-            sns.histplot(
-                data=(diagram.fitted_volumes if i == 0 else errors),
-                kde=True,
-                fill=True,
-                ax=ax,
+            ax.hist(
+                x=(diagram.fitted_volumes if i == 0 else errors),
                 color=color,
             )
-            ax.set_title("Histogram plot")
+            ax.set_title("Volume distribution" if i == 0 else "Error distribution")
             ax.set_xlabel("Fitted volumes" if i == 0 else "Volume errors (%)")
+            ax.set_ylabel("Frequency")
 
         elif i == 1:
-            sns.histplot(
-                data=diagram.fitted_volumes,
-                cumulative=True,
-                stat="density",
-                element="step",
-                fill=False,
-                ax=ax,
+            hist, _ = np.histogram(
+                diagram.fitted_volumes,
+                weights=diagram.fitted_volumes,
+            )
+            ax.hist(
+                hist,
+                density=True,
                 color=color,
             )
-            ax.set_title("Cummulative distribution")
+            ax.set_title("Volume-weighted volume distribution")
             ax.set_xlabel("Fitted volumes")
+            ax.set_ylabel("Normalized frequency")
 
         else:
             marker_style = dict(
