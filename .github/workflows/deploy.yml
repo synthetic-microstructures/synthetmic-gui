@@ -32,5 +32,5 @@ jobs:
       run: rsconnect add --account ${{ secrets.ACCOUNT }} --name ${{ secrets.NAME }} --token ${{ secrets.TOKEN }} --secret ${{ secrets.SECRET }}
 
     - name: Deploy application to shiny cloud
-      run: rsconnect deploy shiny . --name ${{ secrets.NAME }} --title synthetmic-gui --app-id ${{ secrets.APP_FIRST_DEPLOYMENT_ID }}
+      run: rsconnect deploy shiny . --name ${{ secrets.NAME }} --title synthetmic-gui --app-id ${{ secrets.APP_FIRST_DEPLOYMENT_ID }} --exclude /assets
 

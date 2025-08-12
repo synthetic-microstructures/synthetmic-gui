@@ -5,7 +5,7 @@ It uses the fast algorithms (developed in this [paper](https://www.tandfonline.c
 for generating grains of prescribed volumes using optimal transport theory. It is built on
 top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) package which is the Python implementation of the fast algorithms.
 
-This app is available at this [link](link to the app).
+This app is available at this [link](https://david-bourne.shinyapps.io/synthetmic-gui/).
 
 ![app_ui_tab1](./assets/app_ui_tab1.png)
 ![app_ui_tab2](./assets/app_ui_tab2.png)
