@@ -70,3 +70,4 @@ PLOT_DEFAULTS = {
     "fig_extension": FigureExtension.HTML,
     "prop_extension": PropertyExtension.CSV,
 }
+FILL_COLOUR = "#0073CF"

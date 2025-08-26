@@ -2,13 +2,14 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as tck
 import numpy as np
 import pandas as pd
 import pyvista as pv
 from matplotlib.figure import Figure
 from synthetmic import LaguerreDiagramGenerator
 
-from shared.controls import Colorby, Distribution, Slice
+from shared.controls import FILL_COLOUR, Colorby, Distribution, Slice
 
 
 @dataclass(frozen=True)
@@ -17,7 +18,7 @@ class Diagram:
     max_percentage_error: float
     mean_percentage_error: float
     centroids: np.ndarray
-    vertices: np.ndarray
+    vertices: dict[int, list]
     fitted_volumes: np.ndarray
     target_volumes: np.ndarray
     weights: np.ndarray
@@ -217,9 +218,6 @@ def generate_diagram(
     n_iter: int,
     damp_param: float,
 ) -> Diagram:
-    if isinstance(damp_param, int):
-        damp_param = float(damp_param)
-
     generator = LaguerreDiagramGenerator(
         tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=False
     )
@@ -319,9 +317,12 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
             "seeds_initial",
             "seeds_final",
             "centroids",
-            "vertices",
         ),
-        (diagram.seeds, diagram.positions, diagram.centroids, diagram.vertices),
+        (
+            diagram.seeds,
+            diagram.positions,
+            diagram.centroids,
+        ),
     ):
         property_dict[p] = pd.DataFrame(data=d[:, :dim], columns=COORDINATES[:dim])
 
@@ -348,7 +349,10 @@ def plot_volume_dist(diagram: Diagram) -> Figure:
         * 100
         / diagram.target_volumes
     )
-    color = "#0073CF"
+
+    ALPHA = 0.75
+    EC = "black"
+    BINS = "auto"
 
     for i in range(4):
         ax = fig.add_subplot(2, 2, i + 1)
@@ -356,38 +360,66 @@ def plot_volume_dist(diagram: Diagram) -> Figure:
         if i in (0, 2):
             ax.hist(
                 x=(diagram.fitted_volumes if i == 0 else errors),
-                color=color,
+                color=FILL_COLOUR,
+                bins=BINS,
+                alpha=ALPHA,
+                ec=EC,
             )
             ax.set_title("Volume distribution" if i == 0 else "Error distribution")
             ax.set_xlabel("Fitted volumes" if i == 0 else "Volume errors (%)")
             ax.set_ylabel("Frequency")
 
         elif i == 1:
-            hist, _ = np.histogram(
+            ax.hist(
                 diagram.fitted_volumes,
                 weights=diagram.fitted_volumes,
-            )
-            ax.hist(
-                hist,
-                density=True,
-                color=color,
+                density=False,
+                color=FILL_COLOUR,
+                alpha=ALPHA,
+                ec=EC,
             )
             ax.set_title("Volume-weighted volume distribution")
             ax.set_xlabel("Fitted volumes")
             ax.set_ylabel("Normalized frequency")
 
         else:
-            marker_style = dict(
-                alpha=0.7, marker="o", s=40, facecolor="white", edgecolor=color
+            num_vertices_list = []
+
+            space_dim = diagram.seeds.shape[1]
+
+            if space_dim == 2:
+                for vertices in diagram.vertices.values():
+                    num_vertices_list.append(len(vertices))
+
+            elif space_dim == 3:
+                for faces in diagram.vertices.values():
+                    for vertices in faces:
+                        num_vertices_list.append(len(vertices))
+
+            else:
+                raise ValueError(
+                    f"invalid space_dim: {space_dim}; value must be 2 or 3."
+                )
+
+            min_n, max_n = min(num_vertices_list), max(num_vertices_list)
+            bins = np.linspace(
+                min_n - 0.5,
+                max_n + 0.5,
+                num=max_n - min_n + 2,
             )
-            ax.scatter(
-                np.arange(errors.shape[0]),
-                errors,
-                **marker_style,
+            ax.hist(
+                num_vertices_list,
+                bins=bins,
+                color=FILL_COLOUR,
+                alpha=ALPHA,
+                ec=EC,
             )
-            ax.set_title("Scatter plot of percentage errors")
-            ax.set_xlabel("Error index")
-            ax.set_ylabel("Volume errors (%)")
+
+            title_suffix = "per face" if space_dim == 3 else "per grain"
+            ax.set_title(f"Distribution of the number of vertices {title_suffix}")
+            ax.set_xlabel("Number of vertices")
+            ax.set_ylabel("Frequency")
+            ax.xaxis.set_major_locator(tck.MaxNLocator(integer=True))
 
     return fig
 

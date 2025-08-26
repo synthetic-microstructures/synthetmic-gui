@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import pathlib
 import tempfile
@@ -48,7 +49,7 @@ sidebar = ui.sidebar(
         views.create_numeric_input(
             ["tol", "n_iter", "damp_param"],
             ["Volume tolerance", "Lloyd iterations", "Damp param"],
-            [0.1, 5, 1.0],
+            [1.0, 5, 1.0],
         ),
         title="Algorithm",
         help_text=views.algo_help_text(),
@@ -363,14 +364,17 @@ def server(input: Inputs, output: Outputs, session: Session):
             seeds=state_vars.get("seeds"),
             volumes=state_vars.get("volumes"),
             periodic=input.periodic(),
-            tol=input.tol(),
+            tol=float(input.tol()),
             n_iter=input.n_iter(),
-            damp_param=input.damp_param(),
+            damp_param=float(input.damp_param()),
         )
 
     @reactive.effect
     def _():
         diagram = _generated_diagram()
+        if isinstance(diagram, str):
+            return
+
         mesh, plotters = utils.plot_diagram(
             generator=diagram.generator,
             target_volumes=diagram.target_volumes,
@@ -585,6 +589,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render.plot
     def vol_dist_plot():
         diagram = _generated_diagram()
+        if isinstance(diagram, str):
+            return
 
         return utils.plot_volume_dist(diagram)
 
@@ -632,6 +638,9 @@ def server(input: Inputs, output: Outputs, session: Session):
     )
     def download_diagram_property():
         diagram = _generated_diagram()
+        if isinstance(diagram, str):
+            return
+
         diagram_prop = utils.extract_property_as_df(diagram)
 
         zip_buffer = io.BytesIO()
@@ -643,13 +652,23 @@ def server(input: Inputs, output: Outputs, session: Session):
                 zipf.writestr(f"{fname}.{input.prop_extension()}", buffer.getvalue())
                 buffer.close()
 
+            # write the vertices to json
+            buffer = io.StringIO()
+            json.dump(
+                diagram.vertices,
+                buffer,
+                indent=4,
+            )
+            buffer.seek(0)
+            zipf.writestr("vertices.json", buffer.getvalue())
+            buffer.close()
+
         zip_buffer.seek(0)
 
         yield zip_buffer.getvalue()
 
-    def get_tab(tab: str) -> ui.Tag:
+    def get_tab(tab: str) -> ui.Tag | None:
         diagram = _generated_diagram()
-
         if isinstance(diagram, str):
             ui.notification_show(diagram, type="error", duration=None)
             return
@@ -740,7 +759,22 @@ def server(input: Inputs, output: Outputs, session: Session):
                                 ),
                                 views.create_selection(
                                     id="prop_extension",
-                                    label="Download properties as",
+                                    label=(
+                                        "Download properties as",
+                                        ui.popover(
+                                            ui.span(
+                                                fa.icon_svg(
+                                                    "circle-info",
+                                                    fill=ct.FILL_COLOUR,
+                                                ),
+                                                _add_ws=True,
+                                            ),
+                                            ui.markdown(
+                                                "Note that the vertices will always be saved as json, with key as cell IDs and values as vertices. "
+                                                "In the case of 3D, vertices are saved for each faces in a grain."
+                                            ),
+                                        ),
+                                    ),
                                     choices=[e for e in ct.PropertyExtension],
                                     selected=ct.PLOT_DEFAULTS.get("prop_extension"),
                                 ),
@@ -756,7 +790,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                                     icon=fa.icon_svg("gear"),
                                     class_="btn btn-primary",
                                 ),
-                                style="height: 900px; overflow: hidden;",
+                                style="height: 100%; overflow: hidden;",
                             ),
                         ),
                         ui.column(
@@ -765,7 +799,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                                 ui.output_ui(
                                     "display_diagram",
                                 ),
-                                style="height: 900px; overflow: hidden;",
+                                style="height: 100%; overflow: hidden;",
                                 full_screen=True,
                             ),
                         ),
@@ -776,7 +810,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     metrics,
                     ui.card(
                         ui.output_plot("vol_dist_plot"),
-                        style="height: 600px; overflow: hidden;",
+                        style="height: 110%; overflow: hidden;",
                     ),
                 )
 
