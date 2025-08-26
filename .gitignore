@@ -8,4 +8,8 @@ wheels/
 
 # Virtual environments
 .venv/
+
+# dev files and dirs
+data/
 rsconnect-python/
+dev.py
