@@ -1,5 +1,5 @@
 --find-links ./shinydeps
-pysdot==0.2.28
+pysdot==0.2.38
 synthetmic==0.1.3
 faicons>=0.2.2
 numpy>=2.3.1
