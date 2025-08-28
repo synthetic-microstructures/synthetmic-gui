@@ -3,7 +3,7 @@
 SynthetMic-GUI is a web app for generating 2D and 3D synthetic polycrystalline microstructures using Laguerre tessellations.
 It uses the fast algorithms (developed in this [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053))
 for generating grains of prescribed volumes using optimal transport theory. It is built on
-top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) package which is the Python implementation of the fast algorithms.
+top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) and [pysdot](https://github.com/sd-ot/pysdot) packages.
 
 This app is available at this [link](https://david-bourne.shinyapps.io/synthetmic-gui/).
 

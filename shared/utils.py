@@ -153,6 +153,11 @@ def plot_diagram(
 
     mesh.cell_data["vols"] = colorby_values[mesh.cell_data["num"].astype(int)]
 
+    final_seed_positions = generator.get_positions()
+    n_samples, space_dim = final_seed_positions.shape
+
+    NUM_SLICES = 3
+
     plotters = dict()
 
     for s, m in zip(
@@ -160,9 +165,9 @@ def plot_diagram(
         (
             mesh,
             mesh.slice_orthogonal(),
-            mesh.slice_along_axis(axis="x"),
-            mesh.slice_along_axis(axis="y"),
-            mesh.slice_along_axis(axis="z"),
+            mesh.slice_along_axis(n=NUM_SLICES, axis="x"),
+            mesh.slice_along_axis(n=NUM_SLICES, axis="y"),
+            mesh.slice_along_axis(n=NUM_SLICES, axis="z"),
         ),
     ):
         pl = pv.Plotter(
@@ -178,9 +183,6 @@ def plot_diagram(
             cmap=colormap,
             opacity=opacity,
         )
-
-        final_seed_positions = generator.get_positions()
-        n_samples, space_dim = final_seed_positions.shape
 
         if space_dim == 2:
             pl.camera_position = "xy"
