@@ -343,6 +343,20 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
     return property_dict
 
 
+def calculate_num_vertices_3d(
+    grain_face_vertices: dict[int, list], precision: int
+) -> list[int]:
+    res = []
+
+    for grain_faces in grain_face_vertices.values():
+        grain_vertices = np.array([vertex for face in grain_faces for vertex in face])
+        unique_vertices = np.unique(np.round(grain_vertices, precision), axis=0)
+
+        res.append(len(unique_vertices))
+
+    return res
+
+
 def plot_volume_dist(diagram: Diagram) -> Figure:
     fig = plt.figure()
 
@@ -354,7 +368,7 @@ def plot_volume_dist(diagram: Diagram) -> Figure:
 
     ALPHA = 0.75
     EC = "black"
-    BINS = "auto"
+    PRECISION = 8
 
     for i in range(4):
         ax = fig.add_subplot(2, 2, i + 1)
@@ -363,7 +377,6 @@ def plot_volume_dist(diagram: Diagram) -> Figure:
             ax.hist(
                 x=(diagram.fitted_volumes if i == 0 else errors),
                 color=FILL_COLOUR,
-                bins=BINS,
                 alpha=ALPHA,
                 ec=EC,
             )
@@ -394,10 +407,9 @@ def plot_volume_dist(diagram: Diagram) -> Figure:
                     num_vertices_list.append(len(vertices))
 
             elif space_dim == 3:
-                for faces in diagram.vertices.values():
-                    for vertices in faces:
-                        num_vertices_list.append(len(vertices))
-
+                num_vertices_list = calculate_num_vertices_3d(
+                    diagram.vertices, precision=PRECISION
+                )
             else:
                 raise ValueError(
                     f"invalid space_dim: {space_dim}; value must be 2 or 3."
@@ -417,8 +429,7 @@ def plot_volume_dist(diagram: Diagram) -> Figure:
                 ec=EC,
             )
 
-            title_suffix = "per face" if space_dim == 3 else "per grain"
-            ax.set_title(f"Distribution of the number of vertices {title_suffix}")
+            ax.set_title("Distribution of the number of vertices per grain")
             ax.set_xlabel("Number of vertices")
             ax.set_ylabel("Frequency")
             ax.xaxis.set_major_locator(tck.MaxNLocator(integer=True))

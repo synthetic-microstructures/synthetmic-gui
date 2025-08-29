@@ -59,3 +59,4 @@ The following instructions use uv for setting up the app locally.
 - [ ] allow for selective periodicity
 - [ ] triangulation
 - [ ] add the number of vertices / volume to the metrics 
+- [ ] add unique vertices to the downloaded properties
