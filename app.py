@@ -22,7 +22,7 @@ sidebar = ui.sidebar(
     views.group_ui_elements(
         ui.output_ui("space_dim"),
         ui.output_ui("box_dim"),
-        ui.input_switch("periodic", "Periodic", False),
+        ui.output_ui("periodicity"),
         title="Box dimension",
         help_text=views.box_help_text(),
     ),
@@ -185,10 +185,13 @@ def server(input: Inputs, output: Outputs, session: Session):
         state_vars = {}
 
         box_dim = [input.length(), input.breadth()]
+        periodic = [input.is_x_periodic(), input.is_y_periodic()]
         if input.dim() == ct.Dimension.THREE_D:
             iv.add_rule("height", req_gt(rhs=0))
             box_dim.append(input.height())
+            periodic.append(input.is_z_periodic())
 
+        state_vars["periodic"] = periodic
         state_vars["space_dim"] = len(box_dim)
         state_vars["box_dim"] = box_dim
         state_vars["domain_vol"] = np.prod(box_dim)
@@ -363,7 +366,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             domain=state_vars.get("domain"),
             seeds=state_vars.get("seeds"),
             volumes=state_vars.get("volumes"),
-            periodic=input.periodic(),
+            periodic=state_vars.get("periodic"),
             tol=float(input.tol()),
             n_iter=input.n_iter(),
             damp_param=float(input.damp_param()),
@@ -425,6 +428,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             defaults.append(1.0)
 
         return views.create_numeric_input(ids, labels, defaults)
+
+    @render.ui
+    def periodicity() -> ui.Tag:
+        dim_value = 2 if input.dim() == ct.Dimension.TWO_D else 3
+        ids = [f"is_{c}_periodic" for c in utils.COORDINATES[:dim_value]]
+        labels = [f"{c}-coordinate" for c in utils.COORDINATES[:dim_value]]
+        return ui.tags.div(
+            ui.markdown("Periodicity"),
+            views.create_periodic_input(ids, labels),
+        )
 
     @render.ui
     def space_dim() -> ui.Tag:

@@ -59,7 +59,7 @@ def box_help_text() -> ui.HTML:
         """
         **Length**, **Breadth**, and **Height** are, respectively, the length, breadth, and height of the box. 
 
-        Turn on **Periodic** to ensure periodicity of the domain in all directions.
+        **Periodicit** helps turn on periodicity of the domain in any of the given coordinates.
        """
     )
 
@@ -268,3 +268,19 @@ def info_modal() -> None:
             ),
         )
     )
+
+
+def create_periodic_input(ids: list[str], labels: list[str]) -> ui.Tag:
+    width = 12 // len(ids)
+    cols = [
+        ui.column(
+            width,
+            ui.input_switch(
+                id=id,
+                label=label,
+            ),
+        )
+        for id, label in zip(ids, labels)
+    ]
+
+    return ui.row(*cols)

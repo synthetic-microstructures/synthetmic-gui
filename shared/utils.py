@@ -215,7 +215,7 @@ def generate_diagram(
     domain: np.ndarray,
     seeds: np.ndarray,
     volumes: np.ndarray,
-    periodic: bool,
+    periodic: list[bool],
     tol: float,
     n_iter: int,
     damp_param: float,
@@ -227,7 +227,7 @@ def generate_diagram(
         seeds=seeds,
         volumes=volumes,
         domain=domain,
-        periodic=[True] * domain.shape[0] if periodic else None,
+        periodic=periodic,
         init_weights=None,
     )
 
