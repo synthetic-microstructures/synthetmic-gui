@@ -67,7 +67,9 @@ app_ui = ui.page_navbar(
     ui.head_content(ui.tags.style(styles.popover_modal_navbar)),
     id="tab",
     sidebar=sidebar,
-    title="SynthetMic-GUI",
+    title=ui.tags.div(
+        *("SynthetMic-GUI", ui.br(), ui.help_text(utils.get_app_version()))
+    ),
     fillable=True,
     fillable_mobile=True,
 )

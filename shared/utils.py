@@ -2,6 +2,7 @@ import io
 import json
 import os
 import tempfile
+import tomllib
 import zipfile
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Iterable
@@ -721,3 +722,12 @@ def create_prop_download_bytes(diagram: Diagram, prop_extension: str) -> bytes:
     zip_buffer.seek(0)
 
     return zip_buffer.getvalue()
+
+
+def get_app_version() -> str:
+    with open("./pyproject.toml", "rb") as f:
+        pyproject_data = tomllib.load(f)
+
+    version = pyproject_data["project"]["version"]
+
+    return f"v{version}"

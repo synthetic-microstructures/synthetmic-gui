@@ -260,45 +260,6 @@ def server(
                     icon=fa.icon_svg("gear"),
                     class_="btn btn-primary",
                 ),
-                # views.create_selection(
-                #     id="fig_extension",
-                #     label="Download full diagram as",
-                #     choices=[e for e in ct.FigureExtension],
-                #     selected=ct.PLOT_DEFAULTS.get("fig_extension"),
-                # ),
-                # ui.download_button(
-                #     id="download_diagram",
-                #     label="Download diagram",
-                #     icon=fa.icon_svg("download"),
-                #     class_="btn btn-primary",
-                # ),
-                # views.create_selection(
-                #     id="prop_extension",
-                #     label=(
-                #         "Download properties as",
-                #         ui.popover(
-                #             ui.span(
-                #                 fa.icon_svg(
-                #                     "circle-info",
-                #                     fill=ct.FILL_COLOUR,
-                #                 ),
-                #                 _add_ws=True,
-                #             ),
-                #             ui.markdown(
-                #                 "Note that the vertices will always be saved as json, with key as cell IDs and values as vertices. "
-                #                 "In the case of 3D, vertices are saved for each faces in a grain."
-                #             ),
-                #         ),
-                #     ),
-                #     choices=[e for e in ct.PropertyExtension],
-                #     selected=ct.PLOT_DEFAULTS.get("prop_extension"),
-                # ),
-                # ui.download_button(
-                #     id="download_diagram_property",
-                #     label="Download properties",
-                #     icon=fa.icon_svg("download"),
-                #     class_="btn btn-primary",
-                # ),
             ]
         )
 
