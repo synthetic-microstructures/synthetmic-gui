@@ -59,7 +59,7 @@ def box_help_text() -> ui.HTML:
         """
         **Length**, **Breadth**, and **Height** are, respectively, the length, breadth, and height of the box. 
 
-        **Periodicit** helps turn on periodicity of the domain in any of the given coordinates.
+        **Periodicity** helps turn on periodicity of the domain in any of the given coordinates.
        """
     )
 
