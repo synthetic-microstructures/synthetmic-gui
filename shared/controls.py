@@ -9,8 +9,7 @@ class DocSize(StrEnum):
 
 class Tab(StrEnum):
     GEN_MIC = "Generated microstructure"
-    METRICS_AND_PLOTS = "Metrics and plots"
-    SLICING = "Slicing with planes"
+    METRICS_AND_PLOTS = "Full diagram metrics and plots"
 
 
 class Dimension(StrEnum):

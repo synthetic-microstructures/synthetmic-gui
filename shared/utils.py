@@ -1,4 +1,5 @@
 import io
+import itertools
 import json
 import os
 import tempfile
@@ -278,7 +279,7 @@ def generate_slice_diagram(
         periodic_map = dict(zip(COORDINATES, data.periodic))
         periodic = _map_normal_to_periodic(slice_normal, periodic_map)  # type: ignore
 
-    seeds_map = dict(zip(COORDINATES, data.seeds.T))
+    seeds_map = dict(zip(COORDINATES, generator.get_positions().T))
     seeds = _map_normal_to_seeds(slice_normal, seeds_map)  # type: ignore
 
     omega = ConvexPolyhedraAssembly()
@@ -299,6 +300,17 @@ def generate_slice_diagram(
         weights=weights,
         domain=omega,
     )
+
+    # If there is periodicity, then add the replicants
+    if periodic is not None:
+        periodic_dict = {True: [-1, 0, 1], False: [0]}
+        periodic_list = [periodic_dict[p] for p in periodic]
+
+        cartesian_periodic = list(itertools.product(*periodic_list))
+
+        for rep in cartesian_periodic:
+            if rep != (0, 0, 0):
+                pd.add_replication(rep * lens)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".vtk", delete=True) as tmp_file:
         filename = tmp_file.name
@@ -327,7 +339,9 @@ def generate_slice_diagram(
     )
     pl.camera_position = "xy"
 
-    final_seed_positions = pd.get_positions()
+    final_seed_positions = (
+        pd.get_positions()
+    )  # TODO: maybe use centroids? or completely remove it?
     if add_final_seed_positions:
         pl.add_points(
             points=np.column_stack(
