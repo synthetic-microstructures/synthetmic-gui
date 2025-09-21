@@ -47,7 +47,7 @@ def server(
             return generate_slice_diagram(
                 data=data,
                 generator=generator,
-                slice_center=slice_center,
+                slice_value=slice_center,
                 slice_normal=input.slice_normal(),
                 colorby=input.colorby(),
                 colormap=input.colormap(),

@@ -43,8 +43,9 @@ class PropertyExtension(StrEnum):
 
 
 class DiagramView(StrEnum):
-    FULL = "full diagram"
-    SLICE = "slice"
+    FULL = "Full"
+    SLICE = "Slice"
+    CLIP = "Clip"
 
 
 class Colorby(StrEnum):
@@ -63,12 +64,12 @@ PLOT_DEFAULTS: dict[str, Any] = {
     "view": DiagramView.FULL,
     "colorby": Colorby.FITTED_VOLUMES,
     "colormap": "plasma",
-    "addpositions": False,
     "opacity": 1.0,
     "fig_extension": FigureExtension.HTML,
     "prop_extension": PropertyExtension.CSV,
-    "num_slices": 1,
-    "slice_center": 0.0,
+    "slice_value": 0.0,
     "slice_normal": "x",
+    "clip_value": 0.0,
+    "clip_normal": "x",
 }
 FILL_COLOUR: str = "#0073CF"

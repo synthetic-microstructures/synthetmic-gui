@@ -4,14 +4,12 @@ import faicons as fa
 from shiny import ui
 
 import shared.controls as ct
+from shared import styles
 from shared.utils import COORDINATES, VOLUMES
 
 
 def create_selection(
-    id: str,
-    label: ui.TagChild,
-    choices: list[Any],
-    selected: Any,
+    id: str, label: ui.TagChild, choices: list[Any], selected: Any, **props
 ) -> ui.Tag:
     return ui.input_select(
         id=id,
@@ -21,6 +19,7 @@ def create_selection(
         selectize=False,
         remove_button=False,
         multiple=False,
+        **props,
     )
 
 
@@ -284,3 +283,98 @@ def create_periodic_input(ids: list[str], labels: list[str]) -> ui.Tag:
     ]
 
     return ui.row(*cols)
+
+
+# def create_diagram_download_modal(download_btn_id: str) -> ui.Tag:
+#     return ui.modal(
+#         ui.markdown("Are you sure you want to download the current diagram view?"),
+#         ui.help_text(
+#             ui.markdown(
+#                 "This will download the current diagram view and its properties "
+#                 "(such as seeds, volumes, vertices, etc) in various formats. "
+#                 "All outputs will be downloaded in .zip format which can be easily unzipped for futher processing."
+#             )
+#         ),
+#         ui.layout_column_wrap(
+#             ui.modal_button(
+#                 label="No, take me back",
+#                 icon=fa.icon_svg("arrow-left"),
+#                 class_="btn btn-primary",
+#             ),
+#             ui.download_button(
+#                 id=download_btn_id,
+#                 label="Yes, download",
+#                 icon=fa.icon_svg("download"),
+#                 class_="btn btn-primary",
+#             ),
+#         ),
+#         title="Download diagram",
+#         easy_close=False,
+#         footer=None,
+#         size="m",
+#         fade=True,
+#     )
+#
+def create_add_seed_positions_switch(switch_id: str) -> ui.Tag:
+    return ui.input_switch(
+        id=switch_id,
+        label=(
+            "Add final seed positions to diagram",
+            ui.p(),
+            ui.help_text(
+                """Enabling this will overlay the final seed positions on the diagram.
+                        The final seed positions correspond to the optimal seed positions as obtained
+                        from the final step of Lloyd algorithm or the optimal positions when the Lloyd's
+                        iteration is set to 0."""
+            ),
+        ),
+        width="100%",
+    )
+
+
+def create_diagram_view_card(
+    *args,
+    diagram_display_id: str,
+    download_btn_id: str,
+) -> ui.Tag:
+    opts_popover = ui.popover(
+        ui.span(
+            fa.icon_svg(
+                "gear",
+                fill=ct.FILL_COLOUR,
+            ),
+            style=styles.diagram_opts_trigger,
+        ),
+        *args,
+    )
+
+    download_popover = ui.popover(
+        ui.span(
+            fa.icon_svg(
+                "download",
+                fill=ct.FILL_COLOUR,
+            ),
+            style=styles.diagram_download_trigger,
+        ),
+        ui.markdown("Are you sure you want to download the current diagram view?"),
+        ui.help_text(
+            ui.markdown(
+                "This will download the current diagram view and its properties "
+                "(such as seeds, volumes, vertices, etc) in various formats. "
+                "All outputs will be downloaded in .zip format which can be easily unzipped for futher processing."
+            )
+        ),
+        ui.download_button(
+            id=download_btn_id,
+            label="Yes, download the current diagram and properties",
+            icon=fa.icon_svg("download"),
+            class_="btn btn-primary",
+        ),
+    )
+
+    return ui.card(
+        ui.output_ui(diagram_display_id),
+        ui.card_header(opts_popover, download_popover),
+        full_screen=True,
+        style=styles.diagram_card,
+    )

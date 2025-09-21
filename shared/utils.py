@@ -1,12 +1,11 @@
 import io
 import itertools
 import json
-import os
 import tempfile
 import tomllib
 import zipfile
 from dataclasses import asdict, dataclass
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as tck
@@ -18,7 +17,13 @@ from pysdot import ConvexPolyhedraAssembly, PowerDiagram
 from synthetmic import LaguerreDiagramGenerator
 from synthetmic.data.utils import SynthetMicData
 
-from shared.controls import FILL_COLOUR, Colorby, Distribution, FigureExtension
+from shared.controls import (
+    FILL_COLOUR,
+    Colorby,
+    Distribution,
+    FigureExtension,
+    PropertyExtension,
+)
 
 
 @dataclass(frozen=True)
@@ -223,11 +228,10 @@ def generate_slice_diagram(
     data: SynthetMicData,
     generator: LaguerreDiagramGenerator,
     slice_normal: str,
-    slice_center: float,
+    slice_value: float,
     colorby: str,
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
-    add_final_seed_positions: bool = False,
     opacity: float = 1.0,
 ) -> Diagram:
     def _sort_normals(normal: str) -> list[str]:
@@ -269,9 +273,9 @@ def generate_slice_diagram(
     domain = _map_normal_to_domain(slice_normal, domain_map)  # type: ignore
 
     a, b = domain_map[slice_normal]
-    if not (a <= slice_center <= b):
+    if not (a <= slice_value <= b):
         raise ValueError(
-            f"slice_center: {slice_center} is out of domain along the specified normal. Value must be in [{a}, {b}]."
+            f"slice_center: {slice_value} is out of domain along the specified normal. Value must be in [{a}, {b}]."
         )
 
     periodic = None
@@ -293,7 +297,7 @@ def generate_slice_diagram(
                 maxs[k] = maxs[k] + lens[k]
 
     omega.add_box(mins, maxs)
-    weights = generator.get_weights() - (slice_center - seeds_map[slice_normal]) ** 2
+    weights = generator.get_weights() - (slice_value - seeds_map[slice_normal]) ** 2
 
     pd = PowerDiagram(
         positions=seeds,
@@ -319,38 +323,39 @@ def generate_slice_diagram(
         mesh = pv.read(filename)
 
     fitted_volumes = pd.integrals()
-    target_volumes = (
-        fitted_volumes  # FIXME: target volumes are set to calculated vols for now
-    )
-    mesh = prepare_mesh(mesh, target_volumes, fitted_volumes, colorby)  # type: ignore
+
+    if colorby == Colorby.FITTED_VOLUMES:
+        colorby_values = fitted_volumes
+
+    elif colorby == Colorby.RANDOM:
+        colorby_values = np.random.rand(fitted_volumes.shape[0])
+
+    else:
+        raise ValueError(
+            f"Invalid colorby '{colorby}'. Value must be either '{Colorby.FITTED_VOLUMES}' or '{Colorby.RANDOM}'."
+        )
+
+    mesh.cell_data["vols"] = colorby_values[mesh.cell_data["num"].astype(int)]
 
     pl = pv.Plotter(
         off_screen=True,
         window_size=list(window_size),
     )
-
+    # get the min and max of the underlying or base fitted volumes; note that of the base target volumes could also
+    # be used
+    # min_v, max_v = data.volumes.min(), data.volumes.max()
+    base_fitted_volumes = generator.get_fitted_volumes()
+    min_v, max_v = base_fitted_volumes.min(), base_fitted_volumes.max()
     pl.add_mesh(
-        mesh,
+        mesh,  # type: ignore
         show_edges=True,
         show_scalar_bar=False,
         lighting=False,
         cmap=colormap,
         opacity=opacity,
+        clim=[min_v, max_v],
     )
     pl.camera_position = "xy"
-
-    final_seed_positions = (
-        pd.get_positions()
-    )  # TODO: maybe use centroids? or completely remove it?
-    if add_final_seed_positions:
-        pl.add_points(
-            points=np.column_stack(
-                (final_seed_positions, np.zeros(len(final_seed_positions)))  # type: ignore
-            ),
-            render_points_as_spheres=True,
-            color="black",
-            point_size=5,
-        )
     pl.show_axes()  # type: ignore
 
     vertices = {}
@@ -362,14 +367,14 @@ def generate_slice_diagram(
     return Diagram(
         centroids=pd.centroids(),
         vertices=vertices,
-        target_volumes=target_volumes,
+        target_volumes=np.array([]),  # no target volumes for slice
         fitted_volumes=fitted_volumes,
         weights=weights,
         domain=domain,
         seeds=seeds,
-        positions=final_seed_positions,  # type: ignore
+        positions=pd.get_positions(),  # type: ignore
         plotter=pl,
-        mesh=mesh,
+        mesh=mesh,  # type: ignore
     )
 
 
@@ -462,7 +467,7 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
 
     property_dict["domain"] = pd.DataFrame(
         data=diagram.domain,
-        columns=["a", "b"],
+        columns=["a", "b"],  # type: ignore
     )
 
     for p, d in zip(
@@ -477,18 +482,19 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
             diagram.centroids,
         ),
     ):
-        property_dict[p] = pd.DataFrame(data=d[:, :dim], columns=COORDINATES[:dim])
+        property_dict[p] = pd.DataFrame(data=d[:, :dim], columns=COORDINATES[:dim])  # type: ignore
 
-    for p, d in zip(
-        (
-            "weights",
-            "target_volumes",
-            "fitted_volumes",
-        ),
-        (diagram.weights, diagram.target_volumes, diagram.fitted_volumes),
-    ):
+    props = ("weights", "fitted_volumes")
+    data = (diagram.weights, diagram.fitted_volumes)
+
+    if len(diagram.target_volumes) != 0:
+        props += ("target_volumems",)
+        data += (diagram.target_volumes,)
+
+    for p, d in zip(props, data):
         property_dict[p] = pd.DataFrame(
-            data=d, columns=["weights"] if p == "weights" else ["volumes"]
+            data=d,
+            columns=["weights"] if p == "weights" else ["volumes"],  # type: ignore
         )
 
     return property_dict
@@ -595,7 +601,7 @@ def validate_df(
     expected_type: str,
     file: str,
     expected_dim: tuple[int, int] | None = None,
-    bounds: dict[str, Iterable[float]] | None = None,
+    bounds: dict[str, tuple[float, ...]] | None = None,
 ) -> str | None:
     df_colnames = df.columns.to_list()
 
@@ -613,8 +619,8 @@ def validate_df(
     if bounds is not None:
         msg = []
         for c, b in bounds.items():
-            c_min = df[c].values.min()
-            c_max = df[c].values.max()
+            c_min = df[c].min()
+            c_max = df[c].max()
 
             if not all(b[0] <= val <= b[1] for val in [c_min, c_max]):
                 msg.append(
@@ -652,65 +658,7 @@ def summarize_df(df: pd.DataFrame) -> pd.DataFrame:
     return info_df
 
 
-def parse_slice_center(s: str, box_dim: tuple[float, ...]) -> tuple[float, ...] | str:
-    error_prefix: str = "Error in parsing slice center with details"
-    try:
-        center = tuple(float(v.strip()) for v in s.split(","))
-        if len(center) != 3:
-            return f"{error_prefix}: slice center must be a tuple of length 3 but got {len(center)}."
-
-        msg = []
-
-        if len(box_dim) == 2:
-            box_dim = (box_dim[0], box_dim[1], 0)
-
-        for i in range(3):
-            if not (0 <= center[i] <= box_dim[i]):
-                msg.append(
-                    f"Slice center is out of range in the {COORDINATES[i]}-coordinate: "
-                    f"{center[i]} is not in the interval [0, {box_dim[i]}]."
-                )
-
-        if msg:
-            return " ".join(msg)
-
-        return center
-
-    except Exception as e:
-        return f"{error_prefix}: {repr(e)}"
-
-
-def create_diagram_download_bytes(
-    mesh: pv.UnstructuredGrid | pv.PolyData, plotter: pv.Plotter, fig_extension: str
-) -> bytes:
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=f".{fig_extension}", delete=True
-    ) as tmp_file:
-        filename = tmp_file.name
-
-        match fig_extension:
-            case FigureExtension.PDF | FigureExtension.EPS | FigureExtension.SVG:
-                plotter.save_graphic(filename)
-
-            case FigureExtension.HTML:
-                plotter.export_html(filename)
-
-            case FigureExtension.VTK:
-                mesh.save(filename, binary=False)
-
-            case _:
-                os.unlink(filename)  # ensure the file is deleted incase of wrong input
-                raise ValueError(
-                    f"Mismatch extension: {fig_extension}. Input must be one of {', '.join(FigureExtension)}."
-                )
-
-        with open(filename, "rb") as f:
-            content = f.read()
-
-    return content
-
-
-def create_prop_download_bytes(diagram: Diagram, prop_extension: str) -> bytes:
+def create_full_download_bytes(diagram: Diagram) -> bytes:
     diagram_prop = extract_property_as_df(diagram)
 
     zip_buffer = io.BytesIO()
@@ -719,7 +667,10 @@ def create_prop_download_bytes(diagram: Diagram, prop_extension: str) -> bytes:
             buffer = io.BytesIO()
             df.to_csv(buffer, index=False)
             buffer.seek(0)
-            zipf.writestr(f"{fname}.{prop_extension}", buffer.getvalue())
+
+            for ext in PropertyExtension:
+                zipf.writestr(f"{fname}.{ext}", buffer.getvalue())
+
             buffer.close()
 
         # write the vertices to json
@@ -733,6 +684,29 @@ def create_prop_download_bytes(diagram: Diagram, prop_extension: str) -> bytes:
         zipf.writestr("vertices.json", buffer.getvalue())
         buffer.close()
 
+        for ext in FigureExtension:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=f".{ext}", delete=True
+            ) as tmp_file:
+                filename = tmp_file.name
+
+                match ext:
+                    case (
+                        FigureExtension.PDF | FigureExtension.EPS | FigureExtension.SVG
+                    ):
+                        diagram.plotter.save_graphic(filename)
+
+                    case FigureExtension.HTML:
+                        diagram.plotter.export_html(filename)
+
+                    case FigureExtension.VTK:
+                        diagram.mesh.save(filename, binary=False)
+
+                with open(filename, "rb") as f:
+                    content = f.read()
+
+            zipf.writestr(f"diagram.{ext}", content)
+
     zip_buffer.seek(0)
 
     return zip_buffer.getvalue()
@@ -745,3 +719,18 @@ def get_app_version() -> str:
     version = pyproject_data["project"]["version"]
 
     return f"v{version}"
+
+
+def compute_cut_interval(
+    normal: str, coordinates: tuple[str, ...], domain: np.ndarray
+) -> tuple[float, float]:
+    if len(coordinates) != len(domain):
+        raise ValueError("coordinates and domain don't match.")
+
+    if normal not in coordinates:
+        raise ValueError(f"'{normal}' is not in the given coordinates '{coordinates}'.")
+
+    domain_map = dict(zip(coordinates, domain))
+    a, b = domain_map[normal]
+
+    return float(a), float(b)

@@ -8,8 +8,8 @@ from shiny.types import FileInfo
 from shiny_validate import InputValidator, check
 
 import shared.controls as ct
+from pages import genmic, metrics
 from shared import styles, utils, views
-from tabs import gentab, metrictab
 
 sidebar = ui.sidebar(
     views.how_text(),
@@ -61,8 +61,8 @@ sidebar = ui.sidebar(
 )
 
 app_ui = ui.page_navbar(
-    ui.nav_panel(ct.Tab.GEN_MIC, gentab.tab("gentab")),
-    ui.nav_panel(ct.Tab.METRICS_AND_PLOTS, metrictab.tab("metrictab")),
+    ui.nav_panel(ct.Tab.GEN_MIC, genmic.page_ui("genmic")),
+    ui.nav_panel(ct.Tab.METRICS_AND_PLOTS, metrics.page_ui("metrics")),
     ui.head_content(ui.tags.link(rel="icon", type="image/png", href="favicon.ico")),
     ui.head_content(ui.tags.style(styles.popover_modal_navbar)),
     id="tab",
@@ -560,8 +560,12 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(fitted_data, type="error", duration=None)
             return
 
-        gentab.server("gentab", fitted_data)
-        metrictab.server("metrictab", fitted_data)
+        metrics.server("metrics", fitted_data)
+        genmic.server("genmic", fitted_data, input.generate)
 
 
-app = App(app_ui, server, static_assets={"/": f"{pathlib.Path(__file__).parent}/www"})
+app = App(
+    app_ui,
+    server,
+    static_assets={"/": f"{pathlib.Path(__file__).parent}/www"},
+)
