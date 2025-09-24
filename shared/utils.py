@@ -137,7 +137,7 @@ def prepare_mesh(
     target_volumes: np.ndarray,
     fitted_volumes: np.ndarray,
     colorby: str,
-) -> pv.PolyData | pv.UnstructuredGrid:
+) -> tuple[pv.PolyData | pv.UnstructuredGrid, tuple[float, float]]:
     match colorby:
         case Colorby.TARGET_VOLUMES:
             colorby_values = target_volumes
@@ -160,8 +160,9 @@ def prepare_mesh(
             )
 
     mesh.cell_data["vols"] = colorby_values[mesh.cell_data["num"].astype(int)]
+    clim = min(mesh.cell_data["vols"]), max(mesh.cell_data["vols"])
 
-    return mesh
+    return mesh, clim
 
 
 def generate_clip_diagram(
@@ -189,7 +190,7 @@ def generate_clip_diagram(
         )
 
     fitted_volumes = generator.get_fitted_volumes()
-    mesh = prepare_mesh(
+    mesh, clim = prepare_mesh(
         mesh=generator.get_mesh(),
         target_volumes=data.volumes,
         fitted_volumes=fitted_volumes,
@@ -221,8 +222,8 @@ def generate_clip_diagram(
         lighting=False,
         cmap=colormap,
         opacity=opacity,
-        interpolate_before_map=True,
         scalars="vols",
+        clim=clim,
     )
 
     if add_remains_as_wireframe:
@@ -235,6 +236,7 @@ def generate_clip_diagram(
             opacity=opacity,
             cmap=colormap,
             scalars="vols",
+            clim=clim,
         )
 
     if len(data.domain) == 2:
@@ -267,7 +269,7 @@ def generate_full_diagram(
     opacity: float = 1.0,
 ) -> Diagram:
     fitted_volumes = generator.get_fitted_volumes()
-    mesh = prepare_mesh(
+    mesh, clim = prepare_mesh(
         mesh=generator.get_mesh(),
         target_volumes=data.volumes,
         fitted_volumes=fitted_volumes,
@@ -290,7 +292,7 @@ def generate_full_diagram(
         cmap=colormap,
         opacity=opacity,
         scalars="vols",
-        interpolate_before_map=True,
+        clim=clim,
     )
 
     if space_dim == 2:
@@ -424,7 +426,7 @@ def generate_slice_diagram(
         mesh = pv.read(filename)
 
     # note: base target and fitted volumes are used
-    mesh = prepare_mesh(
+    mesh, clim = prepare_mesh(
         mesh=mesh,  # type: ignore
         target_volumes=data.volumes,
         fitted_volumes=generator.get_fitted_volumes(),
@@ -443,7 +445,7 @@ def generate_slice_diagram(
         cmap=colormap,
         opacity=opacity,
         scalars="vols",
-        interpolate_before_map=True,
+        clim=clim,
     )
     pl.camera_position = "xy"
     pl.show_axes()  # type: ignore

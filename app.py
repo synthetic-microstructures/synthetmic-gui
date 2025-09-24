@@ -565,18 +565,13 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.effect
     @reactive.event(input.generate)
     def _():
-        # f = _fitted_data()
-        if isinstance(_fitted_data(), tuple):
-            metrics.server("metrics", _fitted_data())  # type: ignore
-            genmic.server("genmic", _fitted_data(), input.generate)  # type: ignore
+        f = _fitted_data()
+        if isinstance(f, Exception):
+            views.create_error_notification(str(f))
 
-        # if isinstance(f, Exception):
-        #     ui.notification_show(str(f), type="error", duration=None)
-        #
-        # else:
-        #     metrics.server("metrics", f)
-        #     genmic.server("genmic", f, input.generate)
-        #
+        else:
+            metrics.server("metrics", f)
+            genmic.server("genmic", f, input.generate)
 
 
 app = App(

@@ -3,7 +3,6 @@ from datetime import datetime
 import faicons as fa
 from matplotlib import colormaps
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
-from shiny_validate import InputValidator, check
 
 import shared.controls as ct
 from shared import styles, utils, views
@@ -16,7 +15,6 @@ def page_ui() -> ui.Tag:
             3,
             ui.output_ui("common_opts"),
             ui.output_ui("extra_opts"),
-            ui.output_ui("update_btns"),
         ),
         ui.column(
             9,
@@ -33,125 +31,81 @@ def server(
     fitted_data: tuple[utils.SynthetMicData, utils.LaguerreDiagramGenerator],
     global_generate: reactive.Value,
 ):
-    iv = InputValidator()
-    _diagram = reactive.Value(
-        utils.generate_full_diagram(
-            data=fitted_data[0],
-            generator=fitted_data[1],
-            colormap=ct.PLOT_DEFAULTS["colormap"],
-            colorby=ct.PLOT_DEFAULTS["colorby"],
-            opacity=ct.PLOT_DEFAULTS["opacity"],
-            add_final_seed_positions=False,
-        )
-    )
-
-    @reactive.effect
-    @reactive.event(input.update_plot_options)
-    def _():
+    @reactive.calc
+    def _calculate_diagram() -> utils.Diagram | Exception:
         data, generator = fitted_data
         match input.view():
             case ct.DiagramView.FULL:
-                _diagram.set(
-                    utils.generate_full_diagram(
-                        data=data,
-                        generator=generator,
-                        colorby=input.colorby(),
-                        colormap=input.colormap(),
-                        opacity=input.opacity(),
-                        add_final_seed_positions=input.add_final_seed_positions(),
-                    )
+                return utils.generate_full_diagram(
+                    data=data,
+                    generator=generator,
+                    colorby=input.colorby(),
+                    colormap=input.colormap(),
+                    opacity=input.opacity(),
+                    add_final_seed_positions=input.add_final_seed_positions(),
                 )
 
             case ct.DiagramView.SLICE:
                 # when slice view is selected (in 3D mode) and user
                 # changes mode to 2D (and then press generate); default to
                 # full view and quit.
-                if (
-                    len(data.domain) == 2
-                    and input.slice_normal() == utils.COORDINATES[-1]
-                ):
-                    views.create_error_notification(
+                if len(data.domain) == 2:
+                    return Exception(
                         "Slicing is only available for 3D case. Defaulting back to full diagram."
                     )
 
-                else:
-                    a, b = utils.compute_cut_interval(
-                        input.slice_normal(), utils.COORDINATES, data.domain
-                    )
-                    iv.add_rule(
-                        "slice_value",
-                        check.compose_rules(
-                            utils.required(), utils.between(left=a, right=b)
-                        ),
-                    )
-                    iv.enable()
-                    if iv.is_valid():
-                        _diagram.set(
-                            utils.generate_slice_diagram(
-                                data=data,
-                                generator=generator,
-                                colorby=input.colorby(),
-                                slice_normal=input.slice_normal(),
-                                slice_value=input.slice_value(),
-                                colormap=input.colormap(),
-                                opacity=input.opacity(),
-                            )
-                        )
+                return utils.generate_slice_diagram(
+                    data=data,
+                    generator=generator,
+                    colorby=input.colorby(),
+                    slice_normal=input.slice_normal(),
+                    slice_value=input.slice_value(),
+                    colormap=input.colormap(),
+                    opacity=input.opacity(),
+                )
 
             case ct.DiagramView.CLIP:
                 if (
                     len(data.domain) == 2
                     and input.clip_normal() == utils.COORDINATES[-1]
                 ):
-                    views.create_error_notification(
+                    return Exception(
                         f"2D mode is activated whereas clip normal is set to {utils.COORDINATES[-1]}. "
                         "Defaulting back to full diagram view."
                     )
-                else:
-                    a, b = utils.compute_cut_interval(
-                        input.clip_normal(),
-                        utils.COORDINATES[: len(data.domain)],
-                        data.domain,
-                    )
-                    iv.add_rule(
-                        "clip_value",
-                        check.compose_rules(
-                            utils.required(),
-                            utils.between(left=a, right=b, both_open=True),
-                        ),
-                    )
-                    iv.enable()
-                    if iv.is_valid():
-                        try:
-                            _diagram.set(
-                                utils.generate_clip_diagram(
-                                    data=data,
-                                    generator=generator,
-                                    colorby=input.colorby(),
-                                    clip_normal=input.clip_normal(),
-                                    clip_value=input.clip_value(),
-                                    invert=input.invert(),
-                                    add_remains_as_wireframe=input.add_remains_as_wireframe(),
-                                    colormap=input.colormap(),
-                                    opacity=input.opacity(),
-                                )
-                            )
-                        except Exception as e:
-                            views.create_error_notification(
-                                "Error in parsing plot options, possibly clip value is too small for the given domain."
-                                "More information: " + str(e),
-                            )
 
-    @render.ui
-    def display_diagram():
-        return ui.HTML(_diagram().plotter.export_html(filename=None).read())  # type: ignore
+                a, b = utils.compute_cut_interval(
+                    input.clip_normal(),
+                    utils.COORDINATES[: len(data.domain)],
+                    data.domain,
+                )
+                if not (a < input.clip_value() < b):
+                    return Exception(
+                        "Error in parsing plot options. Clips cannot be created on the selected coordinate boundaries."
+                    )
 
-    @render.download(
-        filename=lambda: f"synthetmic-gui-output-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
-        media_type="application/zip",
-    )
-    def download_diagram():
-        yield utils.create_full_download_bytes(_diagram())
+                try:
+                    return utils.generate_clip_diagram(
+                        data=data,
+                        generator=generator,
+                        colorby=input.colorby(),
+                        clip_normal=input.clip_normal(),
+                        clip_value=input.clip_value(),
+                        invert=input.invert(),
+                        add_remains_as_wireframe=input.add_remains_as_wireframe(),
+                        colormap=input.colormap(),
+                        opacity=input.opacity(),
+                    )
+                except Exception as e:
+                    return Exception(
+                        "Error in parsing plot options, possibly clip value is too small for the given domain."
+                        "More information: " + str(e),
+                    )
+
+            case _:
+                return Exception(
+                    f"Invalid view '{input.view()}' provided. Value must be one of {', '.join(ct.DiagramView)}."
+                )
 
     @reactive.effect
     @reactive.event(global_generate)
@@ -217,10 +171,66 @@ def server(
                 ticks=True,
                 width="100%",
             ),
+            ui.input_action_button(
+                id="reset_plot_options",
+                label="Reset common plot options to defaults",
+                icon=fa.icon_svg("gear"),
+                width="100%",
+                class_="btn btn-primary",
+            ),
+        )
+
+    @render.ui
+    def slice_value_slider():
+        data, _ = fitted_data
+        coordinates = utils.COORDINATES[: len(data.domain)]
+
+        if input.slice_normal() not in coordinates:
+            return
+
+        a, b = utils.compute_cut_interval(
+            input.slice_normal(),
+            coordinates,
+            data.domain,
+        )
+
+        return ui.input_slider(
+            id="slice_value",
+            label="Value along the selected normal",
+            value=ct.PLOT_DEFAULTS["slice_value"],
+            min=a,
+            max=b,
+            ticks=True,
+            width="100%",
+        )
+
+    @render.ui
+    def clip_value_slider():
+        data, _ = fitted_data
+        coordinates = utils.COORDINATES[: len(data.domain)]
+
+        if input.clip_normal() not in coordinates:
+            return
+
+        a, b = utils.compute_cut_interval(
+            input.clip_normal(),
+            coordinates,
+            data.domain,
+        )
+        return ui.input_slider(
+            id="clip_value",
+            label="Value along the selected normal",
+            value=(a + b) / 2,
+            min=a,
+            max=b,
+            ticks=True,
+            width="100%",
         )
 
     @render.ui
     def extra_opts():
+        data, _ = fitted_data
+
         opts = ()
         match input.view():
             case ct.DiagramView.FULL:
@@ -237,22 +247,13 @@ def server(
                     views.create_selection(
                         id="slice_normal",
                         label="Choose a normal for slicing",
-                        choices=list(utils.COORDINATES),
+                        choices=list(utils.COORDINATES[: len(data.domain)]),
                         selected=utils.COORDINATES[0],
                         width="100%",
                     ),
-                    ui.input_numeric(
-                        id="slice_value",
-                        label="Value along the selected normal",
-                        value=ct.PLOT_DEFAULTS["slice_value"],
-                        width="100%",
-                    ),
+                    ui.output_ui("slice_value_slider"),
                 )
             case ct.DiagramView.CLIP:
-                data, _ = fitted_data
-                min_lb = min(min(arr) for arr in data.domain)
-                min_ub = min(max(arr) for arr in data.domain)
-                clip_default_value = min_lb + 0.5 * min_ub
                 opts += (
                     views.create_selection(
                         id="clip_normal",
@@ -261,12 +262,7 @@ def server(
                         selected=utils.COORDINATES[0],
                         width="100%",
                     ),
-                    ui.input_numeric(
-                        id="clip_value",
-                        label="Value along the selected normal",
-                        value=clip_default_value,
-                        width="100%",
-                    ),
+                    ui.output_ui("clip_value_slider"),
                     ui.input_switch(
                         id="invert",
                         label="Invert clip",
@@ -282,27 +278,23 @@ def server(
         return ui.card(ui.card_header("Slice and clip options"), *opts)
 
     @render.ui
-    def update_btns():
-        return ui.card(
-            ui.card_header("Update center"),
-            ui.input_task_button(
-                id="update_plot_options",
-                label="Update plot",
-                icon=fa.icon_svg("arrows-spin"),
-                width="100%",
-                class_="btn btn-primary",
-            ),
-            ui.input_action_button(
-                id="reset_plot_options",
-                label="Reset common plot options to defaults",
-                icon=fa.icon_svg("gear"),
-                width="100%",
-                class_="btn btn-primary",
-            ),
-        )
-
-    @render.ui
     def diagram_view_card():
+        diagram = _calculate_diagram()
+        if isinstance(diagram, Exception):
+            views.create_error_notification(str(diagram))
+            return
+
+        @render.ui
+        def display_diagram():
+            return ui.HTML(diagram.plotter.export_html(filename=None).read())  # type: ignore
+
+        @render.download(
+            filename=lambda: f"synthetmic-gui-output-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
+            media_type="application/zip",
+        )
+        def download_diagram():
+            yield utils.create_full_download_bytes(diagram)
+
         download_popover = ui.popover(
             ui.span(
                 fa.icon_svg(
