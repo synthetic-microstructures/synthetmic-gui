@@ -1,4 +1,4 @@
-diagram_card: str = "height: 740px; overflow: hidden;"
+diagram_card: str = "height: 97.4%; overflow: hidden;"
 
 diagram_download_trigger: str = "position:absolute; top: 10px; right: 10px;"
 diagram_opts_trigger: str = "position:absolute; top: 10px; left: 10px;"

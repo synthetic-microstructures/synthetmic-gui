@@ -19,7 +19,6 @@ from synthetmic.data.utils import SynthetMicData
 
 from shared.controls import (
     FILL_COLOUR,
-    Colorby,
     Distribution,
     FigureExtension,
     PropertyExtension,
@@ -38,6 +37,7 @@ class Diagram:
     domain: np.ndarray
     mesh: pv.PolyData | pv.UnstructuredGrid
     plotter: pv.Plotter
+    clips: tuple[pv.UnstructuredGrid, pv.UnstructuredGrid] | None = None
 
 
 COORDINATES = ("x", "y", "z")
@@ -133,47 +133,109 @@ def sample_seeds(
 
 def prepare_mesh(
     mesh: pv.PolyData | pv.UnstructuredGrid,
-    target_volumes: np.ndarray,
-    fitted_volumes: np.ndarray,
-    colorby: str,
 ) -> pv.PolyData | pv.UnstructuredGrid:
-    match colorby:
-        case Colorby.TARGET_VOLUMES:
-            colorby_values = target_volumes
+    return mesh.compute_cell_sizes(length=True, area=True, volume=True)  # type: ignore
 
-        case Colorby.FITTED_VOLUMES:
-            colorby_values = fitted_volumes
 
-        case Colorby.VOLUME_ERRORS:
-            colorby_values = (
-                np.abs(fitted_volumes - target_volumes) * 100 / target_volumes
-            )
+def generate_clip_diagram(
+    data: SynthetMicData,
+    generator: LaguerreDiagramGenerator,
+    clip_normal: str,
+    clip_value: float,
+    invert: bool,
+    add_remains_as_wireframe: bool,
+    colormap: str = "plasma",
+    window_size: tuple[int, int] = (400, 400),
+    opacity: float = 1.0,
+) -> Diagram:
+    if clip_normal not in COORDINATES:
+        raise ValueError(
+            f"Invalid for slice_normal: {clip_normal}. Value must be one of {COORDINATES}."
+        )
 
-        case Colorby.RANDOM:
-            colorby_values = np.random.rand(target_volumes.shape[0])
+    domain_map = dict(zip(COORDINATES, data.domain))
+    a, b = domain_map[clip_normal]
+    if not (a < clip_value < b):
+        raise ValueError(
+            f"clip_center: {clip_value} is out of domain along the specified normal. Value must be in ({a}, {b})."
+        )
 
-        case _:
-            raise ValueError(
-                f"Invalid colorby: {colorby}. Value must be one of {', '.join(Colorby)}"
-            )
+    mesh = prepare_mesh(generator.get_mesh())
+    clips = mesh.clip(
+        normal=clip_normal,
+        origin=(
+            0,
+            0,
+            0,
+        ),  # ensure that origin is taken as (0,0, 0) as all domain originates from 0.
+        value=clip_value,
+        return_clipped=True,
+        crinkle=True,
+        invert=not invert,  # note: invert is negated to have a more intuitive behaviour;
+        # so if clip_value is 0.1 and invert is false, the bits up to 0.1 will be stored as the first element in the returned tuple.
+    )
 
-    mesh.cell_data["vols"] = colorby_values[mesh.cell_data["num"].astype(int)]
+    pl = pv.Plotter(
+        off_screen=True,
+        window_size=list(window_size),
+    )
+    pl.add_mesh(
+        clips[0],  # type: ignore
+        label="Clipped",
+        show_edges=True,
+        show_scalar_bar=False,
+        lighting=False,
+        cmap=colormap,
+        opacity=opacity,
+        interpolate_before_map=True,
+        scalars="Area",
+    )
 
-    return mesh
+    if add_remains_as_wireframe:
+        pl.add_mesh(
+            clips[1],  # type: ignore
+            style="wireframe",
+            label="Remains",
+            show_scalar_bar=False,
+            lighting=False,
+            opacity=opacity,
+            cmap=colormap,
+            scalars="Area",
+        )
+
+    if len(data.domain) == 2:
+        pl.camera_position = "xy"
+        scalar_bar_title = "Area"
+    else:
+        scalar_bar_title = "Vol"
+
+    pl.show_axes()  # type: ignore
+    pl.add_scalar_bar(title=scalar_bar_title)  # type: ignore
+
+    return Diagram(
+        centroids=generator.get_centroids(),
+        vertices=generator.get_vertices(),
+        target_volumes=data.volumes,
+        fitted_volumes=generator.get_fitted_volumes(),
+        weights=generator.get_weights(),
+        domain=data.domain,
+        seeds=data.seeds,
+        positions=generator.get_positions(),
+        plotter=pl,
+        mesh=mesh,
+        clips=clips,  # type: ignore
+    )
 
 
 def generate_full_diagram(
     data: SynthetMicData,
     generator: LaguerreDiagramGenerator,
-    colorby: str,
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
     add_final_seed_positions: bool = False,
     opacity: float = 1.0,
 ) -> Diagram:
-    mesh = prepare_mesh(
-        generator.get_mesh(), data.volumes, generator.get_fitted_volumes(), colorby
-    )
+    mesh = prepare_mesh(generator.get_mesh())
 
     final_seed_positions = generator.get_positions()
     n_samples, space_dim = final_seed_positions.shape
@@ -182,7 +244,6 @@ def generate_full_diagram(
         off_screen=True,
         window_size=list(window_size),
     )
-
     pl.add_mesh(
         mesh,
         show_edges=True,
@@ -190,10 +251,15 @@ def generate_full_diagram(
         lighting=False,
         cmap=colormap,
         opacity=opacity,
+        interpolate_before_map=True,
+        scalars="Area",  # color by cell areas (in 3d vols)
     )
 
     if space_dim == 2:
         pl.camera_position = "xy"
+        scalar_bar_title = "Area"
+    else:
+        scalar_bar_title = "Vol"
 
     if add_final_seed_positions:
         if space_dim == 2:
@@ -209,6 +275,7 @@ def generate_full_diagram(
         )
 
     pl.show_axes()  # type: ignore
+    pl.add_scalar_bar(title=scalar_bar_title)  # type: ignore
 
     return Diagram(
         centroids=generator.get_centroids(),
@@ -229,7 +296,6 @@ def generate_slice_diagram(
     generator: LaguerreDiagramGenerator,
     slice_normal: str,
     slice_value: float,
-    colorby: str,
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
     opacity: float = 1.0,
@@ -322,30 +388,17 @@ def generate_slice_diagram(
         pd.display_vtk(filename)
         mesh = pv.read(filename)
 
-    fitted_volumes = pd.integrals()
-
-    if colorby == Colorby.FITTED_VOLUMES:
-        colorby_values = fitted_volumes
-
-    elif colorby == Colorby.RANDOM:
-        colorby_values = np.random.rand(fitted_volumes.shape[0])
-
-    else:
-        raise ValueError(
-            f"Invalid colorby '{colorby}'. Value must be either '{Colorby.FITTED_VOLUMES}' or '{Colorby.RANDOM}'."
-        )
-
-    mesh.cell_data["vols"] = colorby_values[mesh.cell_data["num"].astype(int)]
+    mesh = prepare_mesh(mesh)  # type: ignore
 
     pl = pv.Plotter(
         off_screen=True,
         window_size=list(window_size),
     )
-    # get the min and max of the underlying or base fitted volumes; note that of the base target volumes could also
-    # be used
-    # min_v, max_v = data.volumes.min(), data.volumes.max()
-    base_fitted_volumes = generator.get_fitted_volumes()
-    min_v, max_v = base_fitted_volumes.min(), base_fitted_volumes.max()
+    # get the min and max of the underlying or base cell volumes
+    base_mesh = generator.get_mesh()
+    base_mesh = prepare_mesh(base_mesh)
+    base_vols = base_mesh.cell_data["Area"]
+    clim = min(base_vols), max(base_vols)
     pl.add_mesh(
         mesh,  # type: ignore
         show_edges=True,
@@ -353,10 +406,13 @@ def generate_slice_diagram(
         lighting=False,
         cmap=colormap,
         opacity=opacity,
-        clim=[min_v, max_v],
+        scalars="Area",
+        clim=clim,
+        interpolate_before_map=True,
     )
     pl.camera_position = "xy"
     pl.show_axes()  # type: ignore
+    pl.add_scalar_bar(title="Area")  # type: ignore
 
     vertices = {}
     offsets, coords = pd.cell_polyhedra()  # type: ignore
@@ -368,7 +424,7 @@ def generate_slice_diagram(
         centroids=pd.centroids(),
         vertices=vertices,
         target_volumes=np.array([]),  # no target volumes for slice
-        fitted_volumes=fitted_volumes,
+        fitted_volumes=pd.integrals(),
         weights=weights,
         domain=domain,
         seeds=seeds,
@@ -706,6 +762,17 @@ def create_full_download_bytes(diagram: Diagram) -> bytes:
                     content = f.read()
 
             zipf.writestr(f"diagram.{ext}", content)
+
+        if diagram.clips is not None:
+            for i, clip in enumerate(diagram.clips, start=1):
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".vtk", delete=True
+                ) as temp_file:
+                    clip.save(temp_file.name, binary=False)
+                    with open(temp_file.name, "rb") as f:
+                        content = f.read()
+
+                zipf.writestr(f"clip_{i}.vtk", content)
 
     zip_buffer.seek(0)
 

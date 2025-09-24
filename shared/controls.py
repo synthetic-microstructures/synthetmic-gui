@@ -43,16 +43,9 @@ class PropertyExtension(StrEnum):
 
 
 class DiagramView(StrEnum):
-    FULL = "Full"
-    SLICE = "Slice"
-    CLIP = "Clip"
-
-
-class Colorby(StrEnum):
-    TARGET_VOLUMES = "target volumes"
-    FITTED_VOLUMES = "fitted volumes"
-    VOLUME_ERRORS = "volume errors"
-    RANDOM = auto()
+    FULL = auto()
+    SLICE = auto()
+    CLIP = auto()
 
 
 class SeedInitializer(StrEnum):
@@ -62,14 +55,10 @@ class SeedInitializer(StrEnum):
 
 PLOT_DEFAULTS: dict[str, Any] = {
     "view": DiagramView.FULL,
-    "colorby": Colorby.FITTED_VOLUMES,
     "colormap": "plasma",
     "opacity": 1.0,
-    "fig_extension": FigureExtension.HTML,
-    "prop_extension": PropertyExtension.CSV,
     "slice_value": 0.0,
     "slice_normal": "x",
-    "clip_value": 0.0,
     "clip_normal": "x",
 }
 FILL_COLOUR: str = "#0073CF"

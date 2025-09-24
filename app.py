@@ -152,7 +152,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.calc
     @reactive.event(input.generate)
     def _fitted_data() -> (
-        tuple[utils.SynthetMicData, utils.LaguerreDiagramGenerator] | str
+        tuple[utils.SynthetMicData, utils.LaguerreDiagramGenerator] | Exception
     ):
         def add_dist_param_to_iv(dist: str, id_prefix: str, **kwargs) -> dict:
             match dist:
@@ -275,7 +275,9 @@ def server(input: Inputs, output: Outputs, session: Session):
                 iv.enable()
                 if iv.is_valid():
                     if _uploaded_volumes() is None:
-                        return "Grain volumes not uploaded. Upload grain volumes and try again."
+                        return Exception(
+                            "Grain volumes not uploaded. Upload grain volumes and try again."
+                        )
 
                     # validate the volumes
                     val_out = utils.validate_df(
@@ -287,7 +289,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         bounds=None,
                     )
                     if isinstance(val_out, str):
-                        return val_out
+                        return Exception(val_out)
 
                     # check if domain volume is close to the sum of the uploaded volumes.
                     VOL_DIFF_TOL = 1e-6
@@ -296,18 +298,22 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ].values  # get the underlying numpy array
                     diff = abs(volumes.sum() - state_vars["domain_vol"])
                     if diff > VOL_DIFF_TOL:
-                        return f"""Mismatch total volume: domain volume is {state_vars["domain_vol"]} whereas total uploaded volume is {volumes.sum()};
-                        a difference of {diff}. Volume difference must be at most {VOL_DIFF_TOL:.2e}."""
+                        return Exception(f"""Mismatch total volume: domain volume is {state_vars["domain_vol"]} whereas total uploaded volume is {volumes.sum()};
+                        a difference of {diff}. Volume difference must be at most {VOL_DIFF_TOL:.2e}.""")
 
                     state_vars["n_grains"] = len(volumes)
                     state_vars["volumes"] = volumes
 
             case _:
-                return f"Mismatch phase: {input.phase()}. Input must be one of {', '.join(ct.Phase)}."
+                return Exception(
+                    f"Mismatch phase: {input.phase()}. Input must be one of {', '.join(ct.Phase)}."
+                )
 
         # check the validity of user inputs
         if not {"n_grains", "volumes"}.issubset(state_vars):
-            return "Invalid inputs. Please check all fields for the required values."
+            return Exception(
+                "Invalid inputs. Please check all fields for the required values."
+            )
 
         # deal with the seeds
         match input.seeds_init():
@@ -323,7 +329,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
             case ct.SeedInitializer.UPLOAD:
                 if _uploaded_seeds() is None:
-                    return "Seeds not uploaded. Upload seeds and try again."
+                    return Exception("Seeds not uploaded. Upload seeds and try again.")
 
                 # validate the seeds
                 val_out = utils.validate_df(
@@ -345,19 +351,23 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ),
                 )
                 if isinstance(val_out, str):
-                    return val_out
+                    return Exception(val_out)
 
                 # add domain and seeds to state_vars since they have been uploaded
                 seeds = _uploaded_seeds()
                 state_vars["seeds"] = seeds.values  # type: ignore  # get the underlying numpy array
 
             case _:
-                return f"Mismatch seed initializer: {input.seeds_init()}. Input must be one of {', '.join(ct.SeedInitializer)}."
+                return Exception(
+                    f"Mismatch seed initializer: {input.seeds_init()}. Input must be one of {', '.join(ct.SeedInitializer)}."
+                )
 
         # finally check if volumes and seeds dim match; very important for the uploads
         if len(state_vars["volumes"]) != len(state_vars["seeds"]):
-            return f"""The number of samples in seeds and grain volumes do not match:
+            return Exception(
+                f"""The number of samples in seeds and grain volumes do not match:
               len(seeds)={len(state_vars["seeds"])}, len(volumes)={len(state_vars["volumes"])}"""
+            )
 
         return utils.fit_data(
             domain=state_vars["domain"],
@@ -555,13 +565,18 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.effect
     @reactive.event(input.generate)
     def _():
-        fitted_data = _fitted_data()
-        if isinstance(fitted_data, str):
-            ui.notification_show(fitted_data, type="error", duration=None)
-            return
+        # f = _fitted_data()
+        if isinstance(_fitted_data(), tuple):
+            metrics.server("metrics", _fitted_data())  # type: ignore
+            genmic.server("genmic", _fitted_data(), input.generate)  # type: ignore
 
-        metrics.server("metrics", fitted_data)
-        genmic.server("genmic", fitted_data, input.generate)
+        # if isinstance(f, Exception):
+        #     ui.notification_show(str(f), type="error", duration=None)
+        #
+        # else:
+        #     metrics.server("metrics", f)
+        #     genmic.server("genmic", f, input.generate)
+        #
 
 
 app = App(
