@@ -244,6 +244,13 @@ def generate_full_diagram(
         off_screen=True,
         window_size=list(window_size),
     )
+
+    if space_dim == 2:
+        pl.camera_position = "xy"
+        scalar_bar_title = "Area"
+    else:
+        scalar_bar_title = "Volume"
+
     pl.add_mesh(
         mesh,
         show_edges=True,
@@ -252,14 +259,8 @@ def generate_full_diagram(
         cmap=colormap,
         opacity=opacity,
         interpolate_before_map=True,
-        scalars="Area",  # color by cell areas (in 3d vols)
+        scalars=scalar_bar_title,  # color by cell areas (in 3d vols)
     )
-
-    if space_dim == 2:
-        pl.camera_position = "xy"
-        scalar_bar_title = "Area"
-    else:
-        scalar_bar_title = "Vol"
 
     if add_final_seed_positions:
         if space_dim == 2:
