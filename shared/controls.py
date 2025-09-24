@@ -2,6 +2,13 @@ from enum import StrEnum, auto
 from typing import Any
 
 
+class Colorby(StrEnum):
+    TARGET_VOLUMES = "target volumes"
+    FITTED_VOLUMES = "fitted volumes"
+    VOLUME_ERRORS = "volume errors"
+    RANDOM = auto()
+
+
 class DocSize(StrEnum):
     BEAMER = auto()
     THESIS = auto()
@@ -55,6 +62,7 @@ class SeedInitializer(StrEnum):
 
 PLOT_DEFAULTS: dict[str, Any] = {
     "view": DiagramView.FULL,
+    "colorby": Colorby.FITTED_VOLUMES,
     "colormap": "plasma",
     "opacity": 1.0,
     "slice_value": 0.0,

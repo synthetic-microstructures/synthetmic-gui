@@ -19,6 +19,7 @@ from synthetmic.data.utils import SynthetMicData
 
 from shared.controls import (
     FILL_COLOUR,
+    Colorby,
     Distribution,
     FigureExtension,
     PropertyExtension,
@@ -133,13 +134,40 @@ def sample_seeds(
 
 def prepare_mesh(
     mesh: pv.PolyData | pv.UnstructuredGrid,
+    target_volumes: np.ndarray,
+    fitted_volumes: np.ndarray,
+    colorby: str,
 ) -> pv.PolyData | pv.UnstructuredGrid:
-    return mesh.compute_cell_sizes(length=True, area=True, volume=True)  # type: ignore
+    match colorby:
+        case Colorby.TARGET_VOLUMES:
+            colorby_values = target_volumes
+
+        case Colorby.FITTED_VOLUMES:
+            colorby_values = fitted_volumes
+
+        case Colorby.VOLUME_ERRORS:
+            colorby_values = (
+                np.abs(fitted_volumes - target_volumes) * 100 / target_volumes
+            )
+
+        case Colorby.RANDOM:
+            np.random.seed(42)  # for reproducibility in a given app session
+            colorby_values = np.random.rand(target_volumes.shape[0])
+
+        case _:
+            raise ValueError(
+                f"Invalid colorby: {colorby}. Value must be one of {', '.join(Colorby)}"
+            )
+
+    mesh.cell_data["vols"] = colorby_values[mesh.cell_data["num"].astype(int)]
+
+    return mesh
 
 
 def generate_clip_diagram(
     data: SynthetMicData,
     generator: LaguerreDiagramGenerator,
+    colorby: str,
     clip_normal: str,
     clip_value: float,
     invert: bool,
@@ -160,7 +188,13 @@ def generate_clip_diagram(
             f"clip_center: {clip_value} is out of domain along the specified normal. Value must be in ({a}, {b})."
         )
 
-    mesh = prepare_mesh(generator.get_mesh())
+    fitted_volumes = generator.get_fitted_volumes()
+    mesh = prepare_mesh(
+        mesh=generator.get_mesh(),
+        target_volumes=data.volumes,
+        fitted_volumes=fitted_volumes,
+        colorby=colorby,
+    )
     clips = mesh.clip(
         normal=clip_normal,
         origin=(
@@ -188,7 +222,7 @@ def generate_clip_diagram(
         cmap=colormap,
         opacity=opacity,
         interpolate_before_map=True,
-        scalars="Area",
+        scalars="vols",
     )
 
     if add_remains_as_wireframe:
@@ -200,23 +234,19 @@ def generate_clip_diagram(
             lighting=False,
             opacity=opacity,
             cmap=colormap,
-            scalars="Area",
+            scalars="vols",
         )
 
     if len(data.domain) == 2:
         pl.camera_position = "xy"
-        scalar_bar_title = "Area"
-    else:
-        scalar_bar_title = "Vol"
 
     pl.show_axes()  # type: ignore
-    pl.add_scalar_bar(title=scalar_bar_title)  # type: ignore
 
     return Diagram(
         centroids=generator.get_centroids(),
         vertices=generator.get_vertices(),
         target_volumes=data.volumes,
-        fitted_volumes=generator.get_fitted_volumes(),
+        fitted_volumes=fitted_volumes,
         weights=generator.get_weights(),
         domain=data.domain,
         seeds=data.seeds,
@@ -230,12 +260,19 @@ def generate_clip_diagram(
 def generate_full_diagram(
     data: SynthetMicData,
     generator: LaguerreDiagramGenerator,
+    colorby: str,
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
     add_final_seed_positions: bool = False,
     opacity: float = 1.0,
 ) -> Diagram:
-    mesh = prepare_mesh(generator.get_mesh())
+    fitted_volumes = generator.get_fitted_volumes()
+    mesh = prepare_mesh(
+        mesh=generator.get_mesh(),
+        target_volumes=data.volumes,
+        fitted_volumes=fitted_volumes,
+        colorby=colorby,
+    )
 
     final_seed_positions = generator.get_positions()
     n_samples, space_dim = final_seed_positions.shape
@@ -247,9 +284,6 @@ def generate_full_diagram(
 
     if space_dim == 2:
         pl.camera_position = "xy"
-        scalar_bar_title = "Area"
-    else:
-        scalar_bar_title = "Volume"
 
     pl.add_mesh(
         mesh,
@@ -258,8 +292,7 @@ def generate_full_diagram(
         lighting=False,
         cmap=colormap,
         opacity=opacity,
-        interpolate_before_map=True,
-        scalars=scalar_bar_title,  # color by cell areas (in 3d vols)
+        scalars="vols",
     )
 
     if add_final_seed_positions:
@@ -276,13 +309,12 @@ def generate_full_diagram(
         )
 
     pl.show_axes()  # type: ignore
-    pl.add_scalar_bar(title=scalar_bar_title)  # type: ignore
 
     return Diagram(
         centroids=generator.get_centroids(),
         vertices=generator.get_vertices(),
         target_volumes=data.volumes,
-        fitted_volumes=generator.get_fitted_volumes(),
+        fitted_volumes=fitted_volumes,
         weights=generator.get_weights(),
         domain=data.domain,
         seeds=data.seeds,
@@ -297,6 +329,7 @@ def generate_slice_diagram(
     generator: LaguerreDiagramGenerator,
     slice_normal: str,
     slice_value: float,
+    colorby: str,
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
     opacity: float = 1.0,
@@ -389,17 +422,18 @@ def generate_slice_diagram(
         pd.display_vtk(filename)
         mesh = pv.read(filename)
 
-    mesh = prepare_mesh(mesh)  # type: ignore
+    # note: base target and fitted volumes are used
+    mesh = prepare_mesh(
+        mesh=mesh,  # type: ignore
+        target_volumes=data.volumes,
+        fitted_volumes=generator.get_fitted_volumes(),
+        colorby=colorby,
+    )
 
     pl = pv.Plotter(
         off_screen=True,
         window_size=list(window_size),
     )
-    # get the min and max of the underlying or base cell volumes
-    base_mesh = generator.get_mesh()
-    base_mesh = prepare_mesh(base_mesh)
-    base_vols = base_mesh.cell_data["Area"]
-    clim = min(base_vols), max(base_vols)
     pl.add_mesh(
         mesh,  # type: ignore
         show_edges=True,
@@ -407,13 +441,10 @@ def generate_slice_diagram(
         lighting=False,
         cmap=colormap,
         opacity=opacity,
-        scalars="Area",
-        clim=clim,
-        interpolate_before_map=True,
+        scalars="vols",
     )
     pl.camera_position = "xy"
     pl.show_axes()  # type: ignore
-    pl.add_scalar_bar(title="Area")  # type: ignore
 
     vertices = {}
     offsets, coords = pd.cell_polyhedra()  # type: ignore

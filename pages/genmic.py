@@ -39,6 +39,7 @@ def server(
             data=fitted_data[0],
             generator=fitted_data[1],
             colormap=ct.PLOT_DEFAULTS["colormap"],
+            colorby=ct.PLOT_DEFAULTS["colorby"],
             opacity=ct.PLOT_DEFAULTS["opacity"],
             add_final_seed_positions=False,
         )
@@ -54,6 +55,7 @@ def server(
                     utils.generate_full_diagram(
                         data=data,
                         generator=generator,
+                        colorby=input.colorby(),
                         colormap=input.colormap(),
                         opacity=input.opacity(),
                         add_final_seed_positions=input.add_final_seed_positions(),
@@ -85,6 +87,7 @@ def server(
                             utils.generate_slice_diagram(
                                 data=data,
                                 generator=generator,
+                                colorby=input.colorby(),
                                 slice_normal=input.slice_normal(),
                                 slice_value=input.slice_value(),
                                 colormap=input.colormap(),
@@ -121,6 +124,7 @@ def server(
                                 utils.generate_clip_diagram(
                                     data=data,
                                     generator=generator,
+                                    colorby=input.colorby(),
                                     clip_normal=input.clip_normal(),
                                     clip_value=input.clip_value(),
                                     invert=input.invert(),
@@ -160,6 +164,7 @@ def server(
         else:
             ui.update_select(id="view", selected=input.view())
 
+        ui.update_select(id="colorby", selected=input.colorby())
         ui.update_select(id="colormap", selected=input.colormap())
         ui.update_slider(id="opacity", value=input.opacity())
 
@@ -167,6 +172,7 @@ def server(
     @reactive.event(input.reset_plot_options)
     def _():
         ui.update_select(id="view", selected=ct.PLOT_DEFAULTS["view"])
+        ui.update_select(id="colorby", selected=ct.PLOT_DEFAULTS["colorby"])
         ui.update_select(id="colormap", selected=ct.PLOT_DEFAULTS["colormap"])
         ui.update_slider(id="opacity", value=ct.PLOT_DEFAULTS["opacity"])
 
@@ -185,6 +191,12 @@ def server(
                 choices=view_choices,
                 selected=ct.DiagramView.FULL,
                 width="100%",
+            ),
+            views.create_selection(
+                id="colorby",
+                label="Color by",
+                choices=[c for c in ct.Colorby],
+                selected=ct.PLOT_DEFAULTS["colorby"],
             ),
             views.create_selection(
                 id="colormap",
