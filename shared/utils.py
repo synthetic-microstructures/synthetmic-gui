@@ -282,9 +282,6 @@ def generate_full_diagram(
         window_size=list(window_size),
     )
 
-    if space_dim == 2:
-        pl.camera_position = "xy"
-
     pl.add_mesh(
         mesh,
         show_edges=True,
@@ -293,7 +290,11 @@ def generate_full_diagram(
         cmap=colormap,
         opacity=opacity,
         scalars="vols",
+        interpolate_before_map=True,
     )
+
+    if space_dim == 2:
+        pl.camera_position = "xy"
 
     if add_final_seed_positions:
         if space_dim == 2:
@@ -442,6 +443,7 @@ def generate_slice_diagram(
         cmap=colormap,
         opacity=opacity,
         scalars="vols",
+        interpolate_before_map=True,
     )
     pl.camera_position = "xy"
     pl.show_axes()  # type: ignore

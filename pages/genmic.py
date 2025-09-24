@@ -66,7 +66,10 @@ def server(
                 # when slice view is selected (in 3D mode) and user
                 # changes mode to 2D (and then press generate); default to
                 # full view and quit.
-                if len(data.domain) == 2:
+                if (
+                    len(data.domain) == 2
+                    and input.slice_normal() == utils.COORDINATES[-1]
+                ):
                     views.create_error_notification(
                         "Slicing is only available for 3D case. Defaulting back to full diagram."
                     )
