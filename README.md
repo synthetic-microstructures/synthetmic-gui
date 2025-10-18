@@ -7,9 +7,6 @@ top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) and
 
 This app is available at this [link](https://david-bourne.shinyapps.io/synthetmic-gui/).
 
-![app_ui_tab1](./assets/app_ui_tab1.png)
-![app_ui_tab2](./assets/app_ui_tab2.png)
-
 ### Local set up
 If you would like to build this project from source either for development purposes or for any other reason, it is recommended to install [uv](https://docs.astral.sh/uv/). This is what is adopted in this project. To install uv, follow the instructions in this [link](https://docs.astral.sh/uv/getting-started/installation/).
 
