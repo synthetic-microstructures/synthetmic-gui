@@ -1,18 +1,31 @@
 import pathlib
+from typing import Callable, Generator
 
-import faicons as fa
 import numpy as np
 import pandas as pd
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
-from shiny.types import FileInfo
+from shiny.types import FileInfo, ImgData
 from shiny_validate import InputValidator, check
 
 import shared.controls as ct
-from pages import genmic, metrics
 from shared import styles, utils, views
+from tabs import genmic
+
+APP_NAME: str = "SynthetMic-GUI"
+APP_VERSION: str = utils.get_app_version()
 
 sidebar = ui.sidebar(
-    views.how_text(),
+    ui.card(
+        ui.card_header("Help center"),
+        ui.markdown(
+            f"Need help? Read how to use {APP_NAME} by clicking the button below."
+        ),
+        views.create_input_action_button(
+            id="show_how_modal",
+            label="Click to see how to use this app and download starting point data",
+            icon="lightbulb",
+        ),
+    ),
     views.group_ui_elements(
         ui.output_ui("space_dim"),
         ui.output_ui("box_dim"),
@@ -48,55 +61,51 @@ sidebar = ui.sidebar(
         title="Algorithm",
         help_text=views.algo_help_text(),
     ),
-    ui.input_task_button(
+    views.create_input_task_button(
         id="generate",
         label="Generate microstructure",
-        icon=fa.icon_svg("person-running"),
-        class_="btn btn-primary",
+        icon="person-running",
     ),
     ui.input_dark_mode(mode="light"),
     views.feedback_text(),
+    ui.help_text(f"{APP_NAME} {APP_VERSION}"),
     width=560,
     id="sidebar",
 )
 
-app_ui = ui.page_navbar(
-    ui.nav_panel(ct.Tab.GEN_MIC, genmic.page_ui("genmic")),
-    ui.nav_panel(ct.Tab.METRICS_AND_PLOTS, metrics.page_ui("metrics")),
+app_ui = ui.page_sidebar(
+    sidebar,
+    genmic.page_ui("genmic"),
     ui.head_content(ui.tags.link(rel="icon", type="image/png", href="favicon.ico")),
     ui.head_content(ui.tags.style(styles.popover_modal_navbar)),
-    id="tab",
-    sidebar=sidebar,
-    title=ui.tags.div(
-        *("SynthetMic-GUI", ui.br(), ui.help_text(utils.get_app_version()))
-    ),
+    title=APP_NAME,
     fillable=True,
     fillable_mobile=True,
 )
 
 
-def server(input: Inputs, output: Outputs, session: Session):
+def server(input: Inputs, output: Outputs, session: Session) -> None:
     # ....................................................................
     #  some validation rules to be reused
     # ...................................................................
-    def req_gt(rhs: float):
+    def req_gt(rhs: float) -> Callable:
         return check.compose_rules(utils.required(), utils.gt(rhs=rhs))
 
-    def req_int_gt(rhs: float):
+    def req_int_gt(rhs: float) -> Callable:
         return check.compose_rules(
             utils.required(),
             utils.integer(),
             utils.gt(rhs=rhs),
         )
 
-    def req_int_gte(rhs: float):
+    def req_int_gte(rhs: float) -> Callable:
         return check.compose_rules(
             utils.required(),
             utils.integer(),
             utils.gte(rhs=rhs),
         )
 
-    def req_between(left: float, right: float):
+    def req_between(left: float, right: float) -> Callable:
         return check.compose_rules(
             utils.required(),
             utils.between(left=left, right=right),
@@ -127,7 +136,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         return periodic
 
     # ....................................................................
-    # reactive and and side effect calculations
+    # reactive and side effect calculations
     # ...................................................................
 
     # define reactive variables for holding uploaded seeds and volumes
@@ -147,7 +156,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         if file is not None:
             _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))  # type: ignore
 
-    views.info_modal()
+    views.info_modal(APP_NAME)
 
     @reactive.calc
     @reactive.event(input.generate)
@@ -218,6 +227,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         input.single_phase_dist(),
                         input.single_phase_n_grains(),
                         state_vars["domain_vol"],  # type: ignore
+                        space_dim=state_vars["space_dim"],
                         **kwargs,
                     )
 
@@ -263,6 +273,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         (input.phase1_n_grains(), input.phase2_n_grains()),
                         (input.phase1_vol_ratio(), input.phase2_vol_ratio()),
                         state_vars["domain_vol"],  # type: ignore
+                        state_vars["space_dim"],
                         (phase1_kwargs, phase2_kwargs),
                     )
 
@@ -383,6 +394,29 @@ def server(input: Inputs, output: Outputs, session: Session):
     # reactive and non-reactive uis
     # ...................................................................
 
+    @render.download(
+        filename=lambda: f"synthetmic-gui-example-{input.example_data()}.zip",
+        media_type="application/zip",
+    )
+    def download_example_data() -> Generator[bytes, None, None]:
+        yield utils.create_example_data_bytes(
+            name=input.example_data(), file_extension=input.example_data_extension()
+        )
+
+    @render.image
+    def example_data_image() -> ImgData:
+        return utils.load_image(
+            pathlib.Path().resolve() / "assets" / f"{input.example_data()}.png",
+        )
+
+    @render.ui
+    def example_data_card() -> ui.Tag:
+        return views.create_example_data_card(
+            name=input.example_data(),
+            image_id="example_data_image",
+            download_id="download_example_data",
+        )
+
     @render.ui
     def box_dim() -> ui.Tag:
         ids = ["length", "breadth"]
@@ -415,9 +449,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
     @render.ui
-    def uploaded_seeds_summary():
+    def uploaded_seeds_summary() -> ui.Tag:
         @render.table
-        def seeds_summary_table():
+        def seeds_summary_table() -> pd.DataFrame:
             return utils.summarize_df(_uploaded_seeds())  # type: ignore
 
         if _uploaded_seeds() is None:
@@ -462,9 +496,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         return views.create_dist_param(input.phase2_dist(), "phase2")
 
     @render.ui
-    def uploaded_volumes_summary():
+    def uploaded_volumes_summary() -> ui.Tag:
         @render.table
-        def volumes_summary_table():
+        def volumes_summary_table() -> pd.DataFrame:
             return utils.summarize_df(_uploaded_volumes())  # type: ignore
 
         if _uploaded_volumes() is None:
@@ -524,7 +558,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.tags.div(
                 views.create_upload_handler(
                     "uploaded_volumes",
-                    "Uplaod volumes as a csv or txt file",
+                    "Upload volumes as a csv or txt file",
                 ),
                 ui.output_ui("uploaded_volumes_summary"),
             )
@@ -563,6 +597,16 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
     @reactive.effect
+    @reactive.event(input.show_how_modal)
+    def _() -> None:
+        views.how_modal(
+            app_name=APP_NAME,
+            data_selection_id="example_data",
+            data_extension_id="example_data_extension",
+            data_card_id="example_data_card",
+        )
+
+    @reactive.effect
     @reactive.event(input.generate)
     def _():
         f = _fitted_data()
@@ -570,7 +614,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             views.create_error_notification(str(f))
 
         else:
-            metrics.server("metrics", f)
             genmic.server("genmic", f, input.generate)
 
 

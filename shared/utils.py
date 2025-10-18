@@ -1,6 +1,7 @@
 import io
 import itertools
 import json
+import pathlib
 import tempfile
 import tomllib
 import zipfile
@@ -14,16 +15,22 @@ import pandas as pd
 import pyvista as pv
 from matplotlib.figure import Figure
 from pysdot import ConvexPolyhedraAssembly, PowerDiagram
+from shiny.types import ImgData
 from synthetmic import LaguerreDiagramGenerator
+from synthetmic.data import paper
 from synthetmic.data.utils import SynthetMicData
 
 from shared.controls import (
     FILL_COLOUR,
     Colorby,
     Distribution,
+    ExampleDataName,
     FigureExtension,
     PropertyExtension,
 )
+
+COORDINATES: tuple[str, str, str] = ("x", "y", "z")
+VOLUMES: str = "volumes"
 
 
 @dataclass(frozen=True)
@@ -41,14 +48,21 @@ class Diagram:
     clips: tuple[pv.UnstructuredGrid, pv.UnstructuredGrid] | None = None
 
 
-COORDINATES = ("x", "y", "z")
-VOLUMES = "volumes"
+@dataclass(frozen=True)
+class Metrics:
+    fig: Figure
+    plot_data: dict[str, dict[str, list]]
+    fitted_volumes_sum: float
+    target_volumes_sum: float | None = None
+    mean_percentage_error: float | None = None
+    max_percentage_error: float | None = None
 
 
 def sample_single_phase_vols(
     dist: str,
     n_grains: int,
     domain_vol: float,
+    space_dim: int,
     **kwargs,
 ) -> np.ndarray:
     match dist:
@@ -64,7 +78,7 @@ def sample_single_phase_vols(
                 )
 
             samples = np.random.uniform(
-                low=kwargs.get("low"), high=kwargs.get("high"), size=n_grains
+                low=kwargs["low"], high=kwargs["high"], size=n_grains
             )
             scaling_factor = domain_vol / samples.sum()
 
@@ -76,10 +90,15 @@ def sample_single_phase_vols(
                     "'mean' and 'std' must be provided for lognormal distribution"
                 )
 
-            sigma = np.sqrt(np.log(1 + (kwargs.get("std") / kwargs.get("mean")) ** 2))
-            mu = -0.5 * sigma**2 + np.log(kwargs.get("mean"))
+            sigma = np.sqrt(np.log(1 + (kwargs["std"] / kwargs["mean"]) ** 2))
+            mu = -0.5 * sigma**2 + np.log(kwargs["mean"])
 
             samples = np.random.lognormal(mean=mu, sigma=sigma, size=n_grains)
+            samples = samples**space_dim
+
+            # samples = np.random.lognormal(
+            #     mean=kwargs["mean"], sigma=kwargs["std"], size=n_grains
+            # )
             scaling_factor = domain_vol / samples.sum()
 
             return scaling_factor * samples
@@ -95,6 +114,7 @@ def sample_dual_phase_vols(
     n_grains: tuple[int, int],
     vol_ratio: tuple[float, float],
     domain_vol: float,
+    space_dim: int,
     dist_kwargs: tuple[dict[str, float], dict[str, float]],
 ) -> np.ndarray:
     phase1_vol = (vol_ratio[0] / sum(vol_ratio)) * domain_vol
@@ -109,6 +129,7 @@ def sample_dual_phase_vols(
                     dist=dist[i],
                     n_grains=n_grains[i],
                     domain_vol=domain_vols[i],
+                    space_dim=space_dim,
                     **dist_kwargs[i],
                 )
                 for i in (0, 1)
@@ -197,7 +218,7 @@ def generate_clip_diagram(
         colorby=colorby,
     )
     clips = mesh.clip(
-        normal=clip_normal,
+        normal=clip_normal,  # type: ignore
         origin=(
             0,
             0,
@@ -241,8 +262,6 @@ def generate_clip_diagram(
 
     if len(data.domain) == 2:
         pl.camera_position = "xy"
-
-    pl.show_axes()  # type: ignore
 
     return Diagram(
         centroids=generator.get_centroids(),
@@ -310,8 +329,6 @@ def generate_full_diagram(
             color="black",
             point_size=5,
         )
-
-    pl.show_axes()  # type: ignore
 
     return Diagram(
         centroids=generator.get_centroids(),
@@ -448,7 +465,6 @@ def generate_slice_diagram(
         clim=clim,
     )
     pl.camera_position = "xy"
-    pl.show_axes()  # type: ignore
 
     vertices = {}
     offsets, coords = pd.cell_polyhedra()  # type: ignore
@@ -494,16 +510,30 @@ def fit_data(
     return data, generator
 
 
-def gt(rhs: float) -> Callable[[float | None], str | None]:
-    return lambda x: f"Must be greater than {rhs}" if (x <= rhs or x is None) else None
+def gt(rhs: float, allow_none: bool = False) -> Callable[[float | None], str | None]:
+    def rule(x: Any) -> bool:
+        if x is None:
+            if allow_none:
+                return True
+
+            return False
+
+        return x > rhs
+
+    return lambda x: None if rule(x) else f"Must be greater than {rhs}"
 
 
-def gte(rhs: float) -> Callable[[float | None], str | None]:
-    return (
-        lambda x: f"Must be greater than or equal to {rhs}"
-        if (x < rhs or x is None)
-        else None
-    )
+def gte(rhs: float, allow_none: bool = False) -> Callable[[float | None], str | None]:
+    def rule(x: Any) -> bool:
+        if x is None:
+            if allow_none:
+                return True
+
+            return False
+
+        return x >= rhs
+
+    return lambda x: None if rule(x) else f"Must be greater than or equal to {rhs}"
 
 
 def required() -> Callable[[Any], str | None]:
@@ -537,7 +567,7 @@ def between(
         return left <= x <= right
 
     return lambda x: (
-        None if (rule(x) or x is None) else f"Must be between {left} and {right}"
+        None if (rule(x) or x is None) else f"Must be between {left} and {right}"  # type: ignore
     )
 
 
@@ -586,7 +616,7 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
     for p, d in zip(props, data):
         property_dict[p] = pd.DataFrame(
             data=d,
-            columns=["weights"] if p == "weights" else ["volumes"],  # type: ignore
+            columns=["weights"] if p == "weights" else [VOLUMES],  # type: ignore
         )
 
     return property_dict
@@ -606,59 +636,84 @@ def calculate_num_vertices_3d(
     return res
 
 
-def plot_volume_dist(
-    seeds: np.ndarray,
-    target_volumes: np.ndarray,
-    fitted_volumes: np.ndarray,
-    vertices: dict[int, list],
-) -> Figure:
+def calculate_metrics(diagram: Diagram) -> Metrics:
     fig = plt.figure()
 
-    errors = np.abs(target_volumes - fitted_volumes) * 100 / target_volumes
+    if diagram.target_volumes.size == 0:
+        errors = np.array([])
+        mean_percentage_error = None
+        max_percentage_error = None
+        target_volumes_sum = None
+    else:
+        errors = (
+            np.abs(diagram.target_volumes - diagram.fitted_volumes)
+            * 100
+            / diagram.target_volumes
+        )
+        mean_percentage_error = errors.mean()
+        max_percentage_error = errors.max()
+        target_volumes_sum = diagram.target_volumes.sum()
 
     ALPHA = 0.75
     EC = "black"
     PRECISION = 8
 
-    for i in range(4):
+    space_dim = diagram.seeds.shape[1]
+    if space_dim == 2:
+        ftitle = "Area"
+    else:
+        ftitle = "Volume"
+
+    non_zero_grain_ids = diagram.fitted_volumes.nonzero()[0]
+    non_zero_grain_size = diagram.fitted_volumes[non_zero_grain_ids]
+
+    plot_data = {}
+
+    keys = (
+        f"{ftitle.lower()}_distribution",
+        f"{ftitle.lower()}-weighted_{ftitle.lower()}_distribution",
+        "error_distribution",
+        "number_of_vertices_per_grain_distribution",
+    )
+
+    for i, k in enumerate(keys):
         ax = fig.add_subplot(2, 2, i + 1)
 
         if i in (0, 2):
-            ax.hist(
-                x=(fitted_volumes if i == 0 else errors),
+            out_values, out_bins, _ = ax.hist(
+                x=non_zero_grain_size if i == 0 else errors,
                 color=FILL_COLOUR,
                 alpha=ALPHA,
                 ec=EC,
+                log=True,
             )
-            ax.set_title("Volume distribution" if i == 0 else "Error distribution")
-            ax.set_xlabel("Fitted volumes" if i == 0 else "Volume errors (%)")
+            ax.set_xlabel(f"{ftitle}s" if i == 0 else f"{ftitle} errors (%)")
             ax.set_ylabel("Frequency")
 
         elif i == 1:
-            ax.hist(
-                fitted_volumes,
-                weights=fitted_volumes,
+            out_values, out_bins, _ = ax.hist(
+                non_zero_grain_size,
+                weights=non_zero_grain_size,
                 density=False,
                 color=FILL_COLOUR,
                 alpha=ALPHA,
                 ec=EC,
             )
-            ax.set_title("Volume-weighted volume distribution")
-            ax.set_xlabel("Fitted volumes")
+            ax.set_xlabel(f"{ftitle}s")
             ax.set_ylabel("Normalized frequency")
 
         else:
             num_vertices_list = []
 
-            space_dim = seeds.shape[1]
-
             if space_dim == 2:
-                for v in vertices.values():
+                for v in [
+                    list(diagram.vertices.values())[idx] for idx in non_zero_grain_ids
+                ]:
                     num_vertices_list.append(len(v))
 
             elif space_dim == 3:
                 num_vertices_list = calculate_num_vertices_3d(
-                    vertices, precision=PRECISION
+                    diagram.vertices, precision=PRECISION
                 )
             else:
                 raise ValueError(
@@ -671,7 +726,7 @@ def plot_volume_dist(
                 max_n + 0.5,
                 num=max_n - min_n + 2,
             )
-            ax.hist(
+            out_values, out_bins, _ = ax.hist(
                 num_vertices_list,
                 bins=bins,  # type: ignore
                 color=FILL_COLOUR,
@@ -679,12 +734,23 @@ def plot_volume_dist(
                 ec=EC,
             )
 
-            ax.set_title("Distribution of the number of vertices per grain")
             ax.set_xlabel("Number of vertices")
             ax.set_ylabel("Frequency")
             ax.xaxis.set_major_locator(tck.MaxNLocator(integer=True))
 
-    return fig
+        ax.set_title(k.replace("_", " ").capitalize())
+        ax.spines[["top", "right"]].set_visible(False)
+
+        plot_data[k] = {"bins": out_bins.tolist(), "bin_values": out_values.tolist()}  # type: ignore
+
+    return Metrics(
+        fig=fig,
+        plot_data=plot_data,
+        fitted_volumes_sum=diagram.fitted_volumes.sum(),
+        target_volumes_sum=target_volumes_sum,
+        mean_percentage_error=mean_percentage_error,
+        max_percentage_error=max_percentage_error,
+    )
 
 
 def validate_df(
@@ -750,7 +816,37 @@ def summarize_df(df: pd.DataFrame) -> pd.DataFrame:
     return info_df
 
 
-def create_full_download_bytes(diagram: Diagram) -> bytes:
+def create_metrics_bytes(fig: Figure, plot_data: dict[str, dict]) -> bytes:
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for ext in (FigureExtension.PDF, FigureExtension.EPS, FigureExtension.SVG):
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=f".{ext}", delete=True
+            ) as tmp_file:
+                filename = tmp_file.name
+                fig.savefig(filename, bbox_inches="tight")
+
+                with open(filename, "rb") as f:
+                    content = f.read()
+
+            zipf.writestr(f"metrics_plot.{ext}", content)
+
+        buffer = io.StringIO()
+        json.dump(
+            plot_data,
+            buffer,
+            indent=4,
+        )
+        buffer.seek(0)
+        zipf.writestr("metrics_data.json", buffer.getvalue())
+        buffer.close()
+
+    zip_buffer.seek(0)
+
+    return zip_buffer.getvalue()
+
+
+def create_diagram_bytes(diagram: Diagram) -> bytes:
     diagram_prop = extract_property_as_df(diagram)
 
     zip_buffer = io.BytesIO()
@@ -837,3 +933,90 @@ def compute_cut_interval(
     a, b = domain_map[normal]
 
     return float(a), float(b)
+
+
+def create_example_data_bytes(name: str, file_extension: str) -> bytes:
+    match name:
+        case ExampleDataName.BASIC:
+            data = paper.create_example3_data(is_periodic=False)
+
+        case (
+            ExampleDataName.RANDOM
+            | ExampleDataName.BANDED
+            | ExampleDataName.CLUSTERED
+            | ExampleDataName.MIXED
+        ):
+            initializer = (
+                "mixed_banded_and_random" if name == ExampleDataName.MIXED else name
+            )
+            data = paper.create_example4_data(
+                initializer=initializer, is_periodic=False
+            )
+
+        case ExampleDataName.INCREASING | ExampleDataName.MIDDLE:
+            gradient = "large_at_middle" if name == ExampleDataName.MIDDLE else name
+            data = paper.create_example4b_data(gradient=gradient, is_periodic=False)
+
+        case ExampleDataName.DP:
+            data = paper.create_example5p4_data(is_periodic=False)
+
+        case ExampleDataName.LOGNORMAL:
+            data = paper.create_example5p5_data(is_periodic=False)
+
+        case _:
+            raise ValueError(
+                f"Invalid data name '{name}'; name must be one of [{', '.join(ExampleDataName)}]."
+            )
+
+    space_dim = len(data.domain)
+    dimension = pd.DataFrame(
+        data=[data.domain[:, 1] - data.domain[:, 0]],
+        columns=("length", "breadth", "height")[:space_dim],  # type: ignore
+    )
+    seeds = pd.DataFrame(
+        data=data.seeds,
+        columns=COORDINATES[:space_dim],  # type: ignore
+    )
+    volumes = pd.DataFrame(
+        data=data.volumes,
+        columns=(VOLUMES,),  # type: ignore
+    )
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for fname, df in zip(
+            ("dimension", "seeds", "volumes"), (dimension, seeds, volumes)
+        ):
+            buffer = io.BytesIO()
+            df.to_csv(buffer, index=False)
+            buffer.seek(0)
+
+            zipf.writestr(f"{fname}.{file_extension}", buffer.getvalue())
+
+            buffer.close()
+
+        # write some metadata to json file
+        buffer = io.StringIO()
+        json.dump(
+            {
+                "space_dimension": space_dim,
+                "number_of_grains": len(data.seeds),
+                "total_volume": data.volumes.sum(),
+            },
+            buffer,
+            indent=4,
+        )
+        buffer.seek(0)
+        zipf.writestr("metadata.json", buffer.getvalue())
+        buffer.close()
+
+    zip_buffer.seek(0)
+
+    return zip_buffer.getvalue()
+
+
+def load_image(image_path: pathlib.Path) -> ImgData:
+    img: ImgData = {
+        "src": image_path,  # type: ignore
+    }
+    return img

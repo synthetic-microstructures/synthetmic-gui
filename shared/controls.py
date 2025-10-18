@@ -2,6 +2,18 @@ from enum import StrEnum, auto
 from typing import Any
 
 
+class ExampleDataName(StrEnum):
+    BASIC = auto()
+    RANDOM = auto()
+    BANDED = auto()
+    CLUSTERED = auto()
+    MIXED = auto()
+    INCREASING = auto()
+    MIDDLE = auto()
+    DP = auto()
+    LOGNORMAL = auto()
+
+
 class Colorby(StrEnum):
     TARGET_VOLUMES = "target volumes"
     FITTED_VOLUMES = "fitted volumes"
@@ -15,8 +27,8 @@ class DocSize(StrEnum):
 
 
 class Tab(StrEnum):
-    GEN_MIC = "Generated microstructure"
-    METRICS_AND_PLOTS = "Full diagram metrics and plots"
+    MICRO = "Microstructure"
+    METRICS = "Metrics"
 
 
 class Dimension(StrEnum):
@@ -69,4 +81,5 @@ PLOT_DEFAULTS: dict[str, Any] = {
     "slice_normal": "x",
     "clip_normal": "x",
 }
+
 FILL_COLOUR: str = "#0073CF"

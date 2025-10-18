@@ -1,6 +1,6 @@
 from datetime import datetime
 
-import faicons as fa
+import faicons
 from matplotlib import colormaps
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 
@@ -10,15 +10,18 @@ from shared import styles, utils, views
 
 @module.ui
 def page_ui() -> ui.Tag:
-    return ui.row(
-        ui.column(
-            3,
-            ui.output_ui("common_opts"),
-            ui.output_ui("extra_opts"),
-        ),
-        ui.column(
-            9,
-            ui.output_ui("diagram_view_card"),
+    return ui.tags.div(
+        ui.output_ui("tab_radio_buttons"),
+        ui.row(
+            ui.column(
+                3,
+                ui.output_ui("common_opts"),
+                ui.output_ui("extra_opts"),
+            ),
+            ui.column(
+                9,
+                ui.output_ui("selected_tab"),
+            ),
         ),
     )
 
@@ -30,7 +33,7 @@ def server(
     session: Session,
     fitted_data: tuple[utils.SynthetMicData, utils.LaguerreDiagramGenerator],
     global_generate: reactive.Value,
-):
+) -> None:
     @reactive.calc
     def _calculate_diagram() -> utils.Diagram | Exception:
         data, generator = fitted_data
@@ -107,6 +110,14 @@ def server(
                     f"Invalid view '{input.view()}' provided. Value must be one of {', '.join(ct.DiagramView)}."
                 )
 
+    @reactive.calc
+    def _calculate_metrics() -> utils.Metrics | Exception:
+        diagram = _calculate_diagram()
+        if isinstance(diagram, Exception):
+            return diagram
+
+        return utils.calculate_metrics(diagram)
+
     @reactive.effect
     @reactive.event(global_generate)
     def _():
@@ -121,6 +132,7 @@ def server(
         else:
             ui.update_select(id="view", selected=input.view())
 
+        ui.update_radio_buttons(id="tab", selected=input.tab())
         ui.update_select(id="colorby", selected=input.colorby())
         ui.update_select(id="colormap", selected=input.colormap())
         ui.update_slider(id="opacity", value=input.opacity())
@@ -134,7 +146,7 @@ def server(
         ui.update_slider(id="opacity", value=ct.PLOT_DEFAULTS["opacity"])
 
     @render.ui
-    def common_opts():
+    def common_opts() -> ui.Tag:
         data, _ = fitted_data
         view_choices = [v for v in ct.DiagramView]
         if len(data.domain) == 2:
@@ -142,46 +154,47 @@ def server(
 
         return ui.card(
             ui.card_header("Common plot options"),
-            views.create_selection(
-                id="view",
-                label="Choose a diagram to view",
-                choices=view_choices,
-                selected=ct.DiagramView.FULL,
-                width="100%",
-            ),
-            views.create_selection(
-                id="colorby",
-                label="Color by",
-                choices=[c for c in ct.Colorby],
-                selected=ct.PLOT_DEFAULTS["colorby"],
-            ),
-            views.create_selection(
-                id="colormap",
-                label="Choose a colormap",
-                choices=sorted(list(colormaps)),
-                selected=ct.PLOT_DEFAULTS["colormap"],
-                width="100%",
-            ),
-            ui.input_slider(
-                id="opacity",
-                label="Diagram opacity",
-                min=0.0,
-                max=1.0,
-                value=ct.PLOT_DEFAULTS["opacity"],
-                ticks=True,
-                width="100%",
-            ),
-            ui.input_action_button(
-                id="reset_plot_options",
-                label="Reset common plot options to defaults",
-                icon=fa.icon_svg("gear"),
-                width="100%",
-                class_="btn btn-primary",
+            ui.tags.div(
+                views.create_selection(
+                    id="view",
+                    label="Choose a diagram to view",
+                    choices=view_choices,
+                    selected=ct.DiagramView.FULL,
+                    width="100%",
+                ),
+                views.create_selection(
+                    id="colorby",
+                    label="Color by",
+                    choices=[c for c in ct.Colorby],
+                    selected=ct.PLOT_DEFAULTS["colorby"],
+                    width="100%",
+                ),
+                views.create_selection(
+                    id="colormap",
+                    label="Choose a colormap",
+                    choices=sorted(list(colormaps)),
+                    selected=ct.PLOT_DEFAULTS["colormap"],
+                    width="100%",
+                ),
+                ui.input_slider(
+                    id="opacity",
+                    label="Diagram opacity",
+                    min=0.0,
+                    max=1.0,
+                    value=ct.PLOT_DEFAULTS["opacity"],
+                    ticks=True,
+                    width="100%",
+                ),
+                views.create_input_action_button(
+                    id="reset_plot_options",
+                    label="Reset common plot options to defaults",
+                    icon="gear",
+                ),
             ),
         )
 
     @render.ui
-    def slice_value_slider():
+    def slice_value_slider() -> ui.Tag | None:
         data, _ = fitted_data
         coordinates = utils.COORDINATES[: len(data.domain)]
 
@@ -205,7 +218,7 @@ def server(
         )
 
     @render.ui
-    def clip_value_slider():
+    def clip_value_slider() -> ui.Tag | None:
         data, _ = fitted_data
         coordinates = utils.COORDINATES[: len(data.domain)]
 
@@ -228,7 +241,7 @@ def server(
         )
 
     @render.ui
-    def extra_opts():
+    def extra_opts() -> ui.Tag:
         data, _ = fitted_data
 
         opts = ()
@@ -263,22 +276,137 @@ def server(
                         width="100%",
                     ),
                     ui.output_ui("clip_value_slider"),
-                    ui.input_switch(
-                        id="invert",
-                        label="Invert clip",
-                        width="100%",
-                    ),
-                    ui.input_switch(
-                        id="add_remains_as_wireframe",
-                        label="Add remains as wireframe",
-                        width="100%",
+                    ui.row(
+                        ui.column(
+                            5,
+                            ui.input_switch(
+                                id="invert",
+                                label="Invert",
+                                width="100%",
+                            ),
+                        ),
+                        ui.column(
+                            7,
+                            ui.input_switch(
+                                id="add_remains_as_wireframe",
+                                label="Add remains",
+                                width="100%",
+                            ),
+                        ),
                     ),
                 )
 
-        return ui.card(ui.card_header("Slice and clip options"), *opts)
+        return ui.card(ui.card_header("Selected view plot options"), ui.tags.div(*opts))
 
     @render.ui
-    def diagram_view_card():
+    def metrics_tab_card() -> ui.Tag | None:
+        metrics = _calculate_metrics()
+        if isinstance(metrics, Exception):
+            views.create_error_notification(str(metrics))
+            return
+
+        @render.plot
+        def plot_metrics():
+            return metrics.fig
+
+        @render.download(
+            filename=lambda: f"synthetmic-gui-metrics-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
+            media_type="application/zip",
+        )
+        def download_metrics():
+            yield utils.create_metrics_bytes(
+                fig=metrics.fig, plot_data=metrics.plot_data
+            )
+
+        download_popover = ui.popover(
+            ui.span(
+                faicons.icon_svg(
+                    "download",
+                    fill=ct.FILL_COLOUR,
+                ),
+                style=styles.diagram_download_trigger,
+            ),
+            ui.markdown("Are you sure you want to download the current metrics?"),
+            ui.help_text(
+                ui.markdown(
+                    """
+                    This will download the current metrics. This involves downloading the plots in various 
+                    file formats as well as the underlying data as json.
+                    All outputs will be downloaded in .zip format which can be easily unzipped for futher processing.
+                    """
+                )
+            ),
+            views.create_download_button(
+                id="download_metrics",
+                label="Yes, download the current metrics",
+            ),
+        )
+
+        stats = []
+
+        for t, v in zip(
+            [
+                "Max percentage error",
+                "Mean percentage error",
+                "Sum of target volumes",
+                "Sum of fitted volumes",
+            ],
+            [
+                metrics.max_percentage_error,
+                metrics.mean_percentage_error,
+                metrics.target_volumes_sum,
+                metrics.fitted_volumes_sum,
+            ],
+        ):
+            if isinstance(v, float):
+                if t in (
+                    "Max percentage error",
+                    "Mean percentage error",
+                ):
+                    v_formated = utils.format_to_standard_form(v, 2)
+                else:
+                    v_formated = f"{v:.2f}"
+
+            elif v is None:
+                v_formated = "NA"
+            else:
+                v_formated = v
+
+            stats.append(
+                ui.value_box(
+                    title=t,
+                    value=v_formated,
+                    full_screen=False,
+                    showcase=faicons.icon_svg("magnifying-glass"),
+                )
+            )
+
+        if input.view() == ct.DiagramView.CLIP:
+            return ui.card(
+                ui.card_header(
+                    faicons.icon_svg("circle-exclamation", fill=ct.FILL_COLOUR),
+                    "A note on metrics",
+                ),
+                ui.markdown(
+                    """
+                    Metrics are not available for clip view. You can only view the clipped microstructure
+                    by selecting the **Microstructure** tab.
+                    """
+                ),
+            )
+
+        return ui.tags.div(
+            ui.layout_column_wrap(*stats),
+            ui.card(
+                ui.output_plot("plot_metrics"),
+                download_popover,
+                full_screen=True,
+                style=styles.metrics_card,
+            ),
+        )
+
+    @render.ui
+    def diagram_tab_card() -> ui.Tag | None:
         diagram = _calculate_diagram()
         if isinstance(diagram, Exception):
             views.create_error_notification(str(diagram))
@@ -293,11 +421,11 @@ def server(
             media_type="application/zip",
         )
         def download_diagram():
-            yield utils.create_full_download_bytes(diagram)
+            yield utils.create_diagram_bytes(diagram)
 
         download_popover = ui.popover(
             ui.span(
-                fa.icon_svg(
+                faicons.icon_svg(
                     "download",
                     fill=ct.FILL_COLOUR,
                 ),
@@ -311,17 +439,38 @@ def server(
                     "All outputs will be downloaded in .zip format which can be easily unzipped for futher processing."
                 )
             ),
-            ui.download_button(
+            views.create_download_button(
                 id="download_diagram",
                 label="Yes, download the current diagram and properties",
-                icon=fa.icon_svg("download"),
-                class_="btn btn-primary",
             ),
         )
 
         return ui.card(
             ui.output_ui("display_diagram"),
-            ui.card_header(download_popover),
+            download_popover,
             full_screen=True,
             style=styles.diagram_card,
         )
+
+    @render.ui
+    def tab_radio_buttons() -> ui.Tag:
+        return ui.div(
+            ui.input_radio_buttons(
+                id="tab",
+                label=None,
+                choices=[t for t in ct.Tab],
+                inline=True,
+            ),
+            style=styles.tab_radio_button,
+        )
+
+    @render.ui
+    def selected_tab() -> ui.Tag:
+        tabs = dict(
+            zip(
+                ct.Tab,
+                (ui.output_ui("diagram_tab_card"), ui.output_ui("metrics_tab_card")),
+            )
+        )
+
+        return tabs[input.tab()]
