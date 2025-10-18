@@ -53,8 +53,3 @@ The following instructions use uv for setting up the app locally.
 - [D. P. Bourne](https://github.com/DPBourne)
 - [S. M. Roper](https://github.com/smr29git)
 
-### Roadmap
-- [x] allow for selective periodicity
-- [ ] triangulation
-- [ ] add the number of vertices / volume to the metrics 
-- [ ] add unique vertices to the downloaded properties

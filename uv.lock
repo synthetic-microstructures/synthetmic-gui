@@ -1429,19 +1429,6 @@ wheels = [
 ]
 
 [[package]]
-name = "plotly"
-version = "6.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "narwhals" },
-    { name = "packaging" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/0c/63/961d47c9ffd592a575495891cdcf7875dc0903ebb33ac238935714213789/plotly-6.3.1.tar.gz", hash = "sha256:dd896e3d940e653a7ce0470087e82c2bd903969a55e30d1b01bb389319461bb0", size = 6956460, upload-time = "2025-10-02T16:10:34.16Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/93/023955c26b0ce614342d11cc0652f1e45e32393b6ab9d11a664a60e9b7b7/plotly-6.3.1-py3-none-any.whl", hash = "sha256:8b4420d1dcf2b040f5983eed433f95732ed24930e496d36eb70d211923532e64", size = 9833698, upload-time = "2025-10-02T16:10:22.584Z" },
-]
-
-[[package]]
 name = "pooch"
 version = "1.8.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2198,7 +2185,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "faicons" },
     { name = "numpy" },
-    { name = "plotly" },
     { name = "rsconnect-python" },
     { name = "seaborn" },
     { name = "shiny" },
@@ -2211,7 +2197,6 @@ dependencies = [
 requires-dist = [
     { name = "faicons", specifier = ">=0.2.2" },
     { name = "numpy", specifier = ">=2.3.1" },
-    { name = "plotly", specifier = ">=6.3.1" },
     { name = "rsconnect-python", specifier = "==1.27.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shiny", specifier = "==1.4.0" },
