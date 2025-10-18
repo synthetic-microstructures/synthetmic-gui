@@ -1,24 +1,31 @@
-import io
-import json
-import os
 import pathlib
-import tempfile
-import zipfile
-from datetime import datetime
+from typing import Callable, Generator
 
-import faicons as fa
 import numpy as np
 import pandas as pd
-from matplotlib import colormaps
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
-from shiny.types import FileInfo
+from shiny.types import FileInfo, ImgData
 from shiny_validate import InputValidator, check
 
 import shared.controls as ct
-from shared import utils, views
+from shared import styles, utils, views
+from tabs import genmic
+
+APP_NAME: str = "SynthetMic-GUI"
+APP_VERSION: str = utils.get_app_version()
 
 sidebar = ui.sidebar(
-    views.how_text(),
+    ui.card(
+        ui.card_header("Help center"),
+        ui.markdown(
+            f"Need help? Read how to use {APP_NAME} by clicking the button below."
+        ),
+        views.create_input_action_button(
+            id="show_how_modal",
+            label="Click to see how to use this app and download starting point data",
+            icon="lightbulb",
+        ),
+    ),
     views.group_ui_elements(
         ui.output_ui("space_dim"),
         ui.output_ui("box_dim"),
@@ -54,68 +61,51 @@ sidebar = ui.sidebar(
         title="Algorithm",
         help_text=views.algo_help_text(),
     ),
-    ui.input_task_button(
+    views.create_input_task_button(
         id="generate",
         label="Generate microstructure",
-        icon=fa.icon_svg("person-running"),
-        class_="btn btn-primary",
+        icon="person-running",
     ),
     ui.input_dark_mode(mode="light"),
     views.feedback_text(),
+    ui.help_text(f"{APP_NAME} {APP_VERSION}"),
     width=560,
     id="sidebar",
 )
 
-app_ui = ui.page_navbar(
-    ui.nav_panel(ct.Tab.GEN_MIC, ui.output_ui(id="gen_mic_tab")),
-    ui.nav_panel(ct.Tab.METRICS_AND_PLOTS, ui.output_ui(id="metrics_and_plots_tab")),
+app_ui = ui.page_sidebar(
+    sidebar,
+    genmic.page_ui("genmic"),
     ui.head_content(ui.tags.link(rel="icon", type="image/png", href="favicon.ico")),
-    ui.head_content(
-        ui.tags.style(
-            """
-        .popover {
-            max-width: 400px !important;
-            width: 400px !important;
-        }
-        .modal-dialog {
-                margin-top: 20px !important;
-                overflow-y: hidden !important;
-        } 
-        .navbar-nav {
-            justify-content: center !important;
-        }
-        """
-        )
-    ),
-    sidebar=sidebar,
-    title="SynthetMic-GUI",
+    ui.head_content(ui.tags.style(styles.popover_modal_navbar)),
+    title=APP_NAME,
     fillable=True,
     fillable_mobile=True,
 )
 
 
-def server(input: Inputs, output: Outputs, session: Session):
+def server(input: Inputs, output: Outputs, session: Session) -> None:
     # ....................................................................
     #  some validation rules to be reused
     # ...................................................................
-    def req_gt(rhs: float):
+    def req_gt(rhs: float) -> Callable:
         return check.compose_rules(utils.required(), utils.gt(rhs=rhs))
 
-    def req_int_gt(rhs: float):
+    def req_int_gt(rhs: float) -> Callable:
         return check.compose_rules(
             utils.required(),
             utils.integer(),
             utils.gt(rhs=rhs),
         )
 
-    def req_int_gte(rhs: float):
+    def req_int_gte(rhs: float) -> Callable:
         return check.compose_rules(
             utils.required(),
             utils.integer(),
             utils.gte(rhs=rhs),
         )
 
-    def req_between(left: float, right: float):
+    def req_between(left: float, right: float) -> Callable:
         return check.compose_rules(
             utils.required(),
             utils.between(left=left, right=right),
@@ -128,33 +118,51 @@ def server(input: Inputs, output: Outputs, session: Session):
     iv.add_rule("damp_param", req_between(left=0.0, right=1.0))
     iv.add_rule("n_iter", req_int_gte(rhs=0))
 
+    # ------------------------------------------------------------------------------
+    # some helper functions for parsing inputs; will be reused
+    # ------------------------------------------------------------------------------
+    def parse_box_dim() -> tuple[float, ...]:
+        box_dim = (input.length(), input.breadth())
+        if input.dim() == ct.Dimension.THREE_D:
+            box_dim += (input.height(),)
+
+        return box_dim
+
+    def parse_periodicity() -> tuple[bool, ...]:
+        periodic = (input.is_x_periodic(), input.is_y_periodic())
+        if input.dim() == ct.Dimension.THREE_D:
+            periodic += (input.is_z_periodic(),)
+
+        return periodic
+
     # ....................................................................
-    # reactive and and side effect calculations
+    # reactive and side effect calculations
     # ...................................................................
 
     # define reactive variables for holding uploaded seeds and volumes
     _uploaded_seeds = reactive.Value(value=None)
     _uploaded_volumes = reactive.Value(value=None)
-    _generated_plotters = reactive.Value(value=None)
 
     @reactive.effect
     def _() -> None:
         file: list[FileInfo] | None = input.uploaded_seeds()
         if file is not None:
-            _uploaded_seeds.set(pd.read_csv(file[0]["datapath"]))
+            _uploaded_seeds.set(pd.read_csv(file[0]["datapath"]))  # type: ignore
 
     @reactive.effect
     def _() -> None:
         file: list[FileInfo] | None = input.uploaded_volumes()
 
         if file is not None:
-            _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))
+            _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))  # type: ignore
 
-    views.info_modal()
+    views.info_modal(APP_NAME)
 
     @reactive.calc
     @reactive.event(input.generate)
-    def _generated_diagram() -> utils.Diagram | str:
+    def _fitted_data() -> (
+        tuple[utils.SynthetMicData, utils.LaguerreDiagramGenerator] | Exception
+    ):
         def add_dist_param_to_iv(dist: str, id_prefix: str, **kwargs) -> dict:
             match dist:
                 case ct.Distribution.UNIFORM:
@@ -164,7 +172,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     return {
                         k: v()
                         for k, v in zip(
-                            ("low", "high"), kwargs.get(ct.Distribution.UNIFORM)
+                            ("low", "high"), kwargs[ct.Distribution.UNIFORM]
                         )
                     }
 
@@ -175,7 +183,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     return {
                         k: v()
                         for k, v in zip(
-                            ("mean", "std"), kwargs.get(ct.Distribution.LOGNORMAL)
+                            ("mean", "std"), kwargs[ct.Distribution.LOGNORMAL]
                         )
                     }
 
@@ -184,12 +192,10 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         state_vars = {}
 
-        box_dim = [input.length(), input.breadth()]
-        periodic = [input.is_x_periodic(), input.is_y_periodic()]
+        box_dim = parse_box_dim()
+        periodic = parse_periodicity()
         if input.dim() == ct.Dimension.THREE_D:
             iv.add_rule("height", req_gt(rhs=0))
-            box_dim.append(input.height())
-            periodic.append(input.is_z_periodic())
 
         state_vars["periodic"] = periodic
         state_vars["space_dim"] = len(box_dim)
@@ -220,7 +226,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                     volumes = utils.sample_single_phase_vols(
                         input.single_phase_dist(),
                         input.single_phase_n_grains(),
-                        state_vars.get("domain_vol"),
+                        state_vars["domain_vol"],  # type: ignore
+                        space_dim=state_vars["space_dim"],
                         **kwargs,
                     )
 
@@ -265,7 +272,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                         (input.phase1_dist(), input.phase2_dist()),
                         (input.phase1_n_grains(), input.phase2_n_grains()),
                         (input.phase1_vol_ratio(), input.phase2_vol_ratio()),
-                        state_vars.get("domain_vol"),
+                        state_vars["domain_vol"],  # type: ignore
+                        state_vars["space_dim"],
                         (phase1_kwargs, phase2_kwargs),
                     )
 
@@ -278,11 +286,13 @@ def server(input: Inputs, output: Outputs, session: Session):
                 iv.enable()
                 if iv.is_valid():
                     if _uploaded_volumes() is None:
-                        return "Grain volumes not uploaded. Upload grain volumes and try again."
+                        return Exception(
+                            "Grain volumes not uploaded. Upload grain volumes and try again."
+                        )
 
                     # validate the volumes
                     val_out = utils.validate_df(
-                        _uploaded_volumes(),
+                        _uploaded_volumes(),  # type: ignore
                         expected_colnames=[utils.VOLUMES],
                         expected_dim=None,
                         expected_type="float",
@@ -290,27 +300,31 @@ def server(input: Inputs, output: Outputs, session: Session):
                         bounds=None,
                     )
                     if isinstance(val_out, str):
-                        return val_out
+                        return Exception(val_out)
 
                     # check if domain volume is close to the sum of the uploaded volumes.
                     VOL_DIFF_TOL = 1e-6
-                    volumes = _uploaded_volumes()[
+                    volumes = _uploaded_volumes()[  # type: ignore
                         utils.VOLUMES
                     ].values  # get the underlying numpy array
-                    diff = abs(volumes.sum() - state_vars.get("domain_vol"))
+                    diff = abs(volumes.sum() - state_vars["domain_vol"])
                     if diff > VOL_DIFF_TOL:
-                        return f"""Mismatch total volume: domain volume is {state_vars.get("domain_vol")} whereas total uploaded volume is {volumes.sum()};
-                        a difference of {diff}. Volume difference must be at most {VOL_DIFF_TOL:.2e}."""
+                        return Exception(f"""Mismatch total volume: domain volume is {state_vars["domain_vol"]} whereas total uploaded volume is {volumes.sum()};
+                        a difference of {diff}. Volume difference must be at most {VOL_DIFF_TOL:.2e}.""")
 
                     state_vars["n_grains"] = len(volumes)
                     state_vars["volumes"] = volumes
 
             case _:
-                return f"Mismatch phase: {input.phase()}. Input must be one of {', '.join(ct.Phase)}."
+                return Exception(
+                    f"Mismatch phase: {input.phase()}. Input must be one of {', '.join(ct.Phase)}."
+                )
 
         # check the validity of user inputs
         if not {"n_grains", "volumes"}.issubset(state_vars):
-            return "Invalid inputs. Please check all fields for the required values."
+            return Exception(
+                "Invalid inputs. Please check all fields for the required values."
+            )
 
         # deal with the seeds
         match input.seeds_init():
@@ -318,104 +332,90 @@ def server(input: Inputs, output: Outputs, session: Session):
                 iv.add_rule("random_state", utils.integer(allow_none=True))
 
                 _, seeds = utils.sample_seeds(
-                    state_vars.get("n_grains"),
+                    state_vars["n_grains"],
                     input.random_state(),
-                    *state_vars.get("box_dim"),
+                    *state_vars["box_dim"],  # type: ignore
                 )
                 state_vars["seeds"] = seeds
 
             case ct.SeedInitializer.UPLOAD:
                 if _uploaded_seeds() is None:
-                    return "Seeds not uploaded. Upload seeds and try again."
+                    return Exception("Seeds not uploaded. Upload seeds and try again.")
 
                 # validate the seeds
                 val_out = utils.validate_df(
-                    _uploaded_seeds(),
-                    expected_colnames=list(utils.COORDINATES)[
-                        : state_vars.get("space_dim")
+                    _uploaded_seeds(),  # type: ignore
+                    expected_colnames=list(utils.COORDINATES)[  # type: ignore
+                        : state_vars["space_dim"]
                     ],
                     expected_dim=(
-                        state_vars.get("n_grains"),
-                        state_vars.get("space_dim"),
+                        state_vars["n_grains"],
+                        state_vars["space_dim"],
                     ),
                     expected_type="float",
                     file="seeds",
                     bounds=dict(
                         zip(
-                            utils.COORDINATES[: state_vars.get("space_dim")],
-                            state_vars.get("domain"),
+                            utils.COORDINATES[: state_vars["space_dim"]],
+                            state_vars["domain"],
                         )
                     ),
                 )
                 if isinstance(val_out, str):
-                    return val_out
+                    return Exception(val_out)
 
                 # add domain and seeds to state_vars since they have been uploaded
                 seeds = _uploaded_seeds()
-                state_vars["seeds"] = seeds.values  # get the underlying numpy array
+                state_vars["seeds"] = seeds.values  # type: ignore  # get the underlying numpy array
 
             case _:
-                return f"Mismatch seed initializer: {input.seeds_init()}. Input must be one of {', '.join(ct.SeedInitializer)}."
+                return Exception(
+                    f"Mismatch seed initializer: {input.seeds_init()}. Input must be one of {', '.join(ct.SeedInitializer)}."
+                )
 
         # finally check if volumes and seeds dim match; very important for the uploads
-        if len(state_vars.get("volumes")) != len(state_vars.get("seeds")):
-            return f"""The number of samples in seeds and grain volumes do not match:
-              len(seeds)={len(state_vars.get("seeds"))}, len(volumes)={len(state_vars.get("volumes"))}"""
+        if len(state_vars["volumes"]) != len(state_vars["seeds"]):
+            return Exception(
+                f"""The number of samples in seeds and grain volumes do not match:
+              len(seeds)={len(state_vars["seeds"])}, len(volumes)={len(state_vars["volumes"])}"""
+            )
 
-        return utils.generate_diagram(
-            domain=state_vars.get("domain"),
-            seeds=state_vars.get("seeds"),
-            volumes=state_vars.get("volumes"),
-            periodic=state_vars.get("periodic"),
+        return utils.fit_data(
+            domain=state_vars["domain"],
+            seeds=state_vars["seeds"],
+            volumes=state_vars["volumes"],
+            periodic=list(state_vars["periodic"]),
             tol=float(input.tol()),
             n_iter=input.n_iter(),
             damp_param=float(input.damp_param()),
         )
 
-    @reactive.effect
-    def _():
-        diagram = _generated_diagram()
-        if isinstance(diagram, str):
-            return
-
-        mesh, plotters = utils.plot_diagram(
-            generator=diagram.generator,
-            target_volumes=diagram.target_volumes,
-            colorby=input.colorby(),
-            colormap=input.colormap(),
-            add_final_seed_positions=input.addpositions(),
-            opacity=input.opacity(),
-        )
-
-        _generated_plotters.set((mesh, plotters))
-
-        # ensure most recent plot settings are remembered
-        ui.update_select(id="slice", selected=input.slice())
-        ui.update_select(id="colorby", selected=input.colorby())
-        ui.update_select(id="colormap", selected=input.colormap())
-        ui.update_switch(id="addpositions", value=input.addpositions())
-        ui.update_slider(id="opacity", value=input.opacity())
-        ui.update_select(id="fig_extension", selected=input.fig_extension())
-        ui.update_select(id="prop_extension", selected=input.prop_extension())
-
-    @reactive.effect
-    @reactive.event(input.reset_plot_options)
-    def _():
-        ui.update_select(id="slice", selected=ct.PLOT_DEFAULTS.get("slice"))
-        ui.update_select(id="colorby", selected=ct.PLOT_DEFAULTS.get("colorby"))
-        ui.update_select(id="colormap", selected=ct.PLOT_DEFAULTS.get("colormap"))
-        ui.update_switch(id="addpositions", value=ct.PLOT_DEFAULTS.get("addpositions"))
-        ui.update_slider(id="opacity", value=ct.PLOT_DEFAULTS.get("opacity"))
-        ui.update_select(
-            id="fig_extension", selected=ct.PLOT_DEFAULTS.get("fig_extension")
-        )
-        ui.update_select(
-            id="prop_extension", selected=ct.PLOT_DEFAULTS.get("prop_extension")
-        )
-
     # ....................................................................
     # reactive and non-reactive uis
     # ...................................................................
+
+    @render.download(
+        filename=lambda: f"synthetmic-gui-example-{input.example_data()}.zip",
+        media_type="application/zip",
+    )
+    def download_example_data() -> Generator[bytes, None, None]:
+        yield utils.create_example_data_bytes(
+            name=input.example_data(), file_extension=input.example_data_extension()
+        )
+
+    @render.image
+    def example_data_image() -> ImgData:
+        return utils.load_image(
+            pathlib.Path().resolve() / "assets" / f"{input.example_data()}.png",
+        )
+
+    @render.ui
+    def example_data_card() -> ui.Tag:
+        return views.create_example_data_card(
+            name=input.example_data(),
+            image_id="example_data_image",
+            download_id="download_example_data",
+        )
 
     @render.ui
     def box_dim() -> ui.Tag:
@@ -449,10 +449,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
     @render.ui
-    def uploaded_seeds_summary():
+    def uploaded_seeds_summary() -> ui.Tag:
         @render.table
-        def seeds_summary_table():
-            return utils.summarize_df(_uploaded_seeds())
+        def seeds_summary_table() -> pd.DataFrame:
+            return utils.summarize_df(_uploaded_seeds())  # type: ignore
 
         if _uploaded_seeds() is None:
             return ui.help_text(
@@ -466,7 +466,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         if input.seeds_init() == ct.SeedInitializer.RANDOM:
             return ui.tags.div(
                 ui.input_numeric(
-                    id="random_state", label="Seeds random state", value=None
+                    id="random_state",
+                    label="Seeds random state",
+                    value=None,  # type: ignore
                 ),
                 ui.help_text(
                     "Seeds will be randomly generated in the specified box above."
@@ -494,10 +496,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         return views.create_dist_param(input.phase2_dist(), "phase2")
 
     @render.ui
-    def uploaded_volumes_summary():
+    def uploaded_volumes_summary() -> ui.Tag:
         @render.table
-        def volumes_summary_table():
-            return utils.summarize_df(_uploaded_volumes())
+        def volumes_summary_table() -> pd.DataFrame:
+            return utils.summarize_df(_uploaded_volumes())  # type: ignore
 
         if _uploaded_volumes() is None:
             return ui.help_text(
@@ -556,7 +558,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.tags.div(
                 views.create_upload_handler(
                     "uploaded_volumes",
-                    "Uplaod volumes as a csv or txt file",
+                    "Upload volumes as a csv or txt file",
                 ),
                 ui.output_ui("uploaded_volumes_summary"),
             )
@@ -594,251 +596,29 @@ def server(input: Inputs, output: Outputs, session: Session):
             "of the domain volume."
         )
 
-    @render.ui
-    def display_diagram():
-        _, plotters = _generated_plotters()
-        return ui.HTML(plotters.get(input.slice()).export_html(filename=None).read())
-
-    @render.plot
-    def vol_dist_plot():
-        diagram = _generated_diagram()
-        if isinstance(diagram, str):
-            return
-
-        return utils.plot_volume_dist(diagram)
-
-    @render.download(
-        filename=lambda: f"full-diagram-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.{input.fig_extension()}",
-    )
-    def download_full_diagram():
-        mesh, plotters = _generated_plotters()
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=f".{input.fig_extension()}", delete=True
-        ) as tmp_file:
-            filename = tmp_file.name
-
-            match input.fig_extension():
-                case (
-                    ct.FigureExtension.PDF
-                    | ct.FigureExtension.EPS
-                    | ct.FigureExtension.SVG
-                ):
-                    plotters.get(utils.Slice.FULL).save_graphic(filename)
-
-                case ct.FigureExtension.HTML:
-                    plotters.get(utils.Slice.FULL).export_html(filename)
-
-                case ct.FigureExtension.VTK:
-                    mesh.save(filename, binary=False)
-
-                case _:
-                    os.unlink(
-                        filename
-                    )  # ensure the file is deleted incase of wrong input
-                    raise ValueError(
-                        f"Mismatch extension: {input.fig_extension()}. Input must be one of {', '.join(ct.FigureExtension)}."
-                    )
-
-            with open(filename, "rb") as f:
-                content = f.read()
-
-        yield content
-
-    @render.download(
-        filename=lambda: f"diagram-property-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
-        media_type="application/zip",
-    )
-    def download_diagram_property():
-        diagram = _generated_diagram()
-        if isinstance(diagram, str):
-            return
-
-        diagram_prop = utils.extract_property_as_df(diagram)
-
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for fname, df in diagram_prop.items():
-                buffer = io.BytesIO()
-                df.to_csv(buffer, index=False)
-                buffer.seek(0)
-                zipf.writestr(f"{fname}.{input.prop_extension()}", buffer.getvalue())
-                buffer.close()
-
-            # write the vertices to json
-            buffer = io.StringIO()
-            json.dump(
-                diagram.vertices,
-                buffer,
-                indent=4,
-            )
-            buffer.seek(0)
-            zipf.writestr("vertices.json", buffer.getvalue())
-            buffer.close()
-
-        zip_buffer.seek(0)
-
-        yield zip_buffer.getvalue()
-
-    def get_tab(tab: str) -> ui.Tag | None:
-        diagram = _generated_diagram()
-        if isinstance(diagram, str):
-            ui.notification_show(diagram, type="error", duration=None)
-            return
-
-        diagram_ctrl = views.create_selection(
-            id="slice",
-            label="Choose a diagram to view",
-            choices=[s for s in ct.Slice],
-            selected=ct.Slice.FULL,
+    @reactive.effect
+    @reactive.event(input.show_how_modal)
+    def _() -> None:
+        views.how_modal(
+            app_name=APP_NAME,
+            data_selection_id="example_data",
+            data_extension_id="example_data_extension",
+            data_card_id="example_data_card",
         )
 
-        metrics = ui.layout_column_wrap(
-            *[
-                ui.value_box(
-                    title=t,
-                    value=utils.format_to_standard_form(v, 2)
-                    if t
-                    in (
-                        "Max percentage error",
-                        "Mean percentage error",
-                    )
-                    else f"{v:.2f}",
-                    full_screen=False,
-                    showcase=fa.icon_svg("magnifying-glass"),
-                    height="160px",
-                )
-                for t, v in zip(
-                    [
-                        "Max percentage error",
-                        "Mean percentage error",
-                        "Sum of target volumes",
-                        "Sum of fitted volumes",
-                    ],
-                    [
-                        diagram.max_percentage_error,
-                        diagram.mean_percentage_error,
-                        diagram.target_volumes.sum(),
-                        diagram.fitted_volumes.sum(),
-                    ],
-                )
-            ]
-        )
+    @reactive.effect
+    @reactive.event(input.generate)
+    def _():
+        f = _fitted_data()
+        if isinstance(f, Exception):
+            views.create_error_notification(str(f))
 
-        match tab:
-            case ct.Tab.GEN_MIC:
-                return ui.tags.div(
-                    ui.row(
-                        ui.column(
-                            3,
-                            ui.card(
-                                diagram_ctrl,
-                                views.create_selection(
-                                    id="colorby",
-                                    label="Color by",
-                                    choices=[c for c in ct.Colorby],
-                                    selected=ct.PLOT_DEFAULTS.get("colorby"),
-                                ),
-                                views.create_selection(
-                                    id="colormap",
-                                    label="Choose a colormap",
-                                    choices=sorted(list(colormaps)),
-                                    selected=ct.PLOT_DEFAULTS.get("colormap"),
-                                ),
-                                ui.input_switch(
-                                    "addpositions",
-                                    "Add final seed positions",
-                                    ct.PLOT_DEFAULTS.get("addpositions"),
-                                ),
-                                ui.input_slider(
-                                    id="opacity",
-                                    label="Diagram opacity",
-                                    min=0.0,
-                                    max=1.0,
-                                    value=ct.PLOT_DEFAULTS.get("opacity"),
-                                    ticks=True,
-                                ),
-                                views.create_selection(
-                                    id="fig_extension",
-                                    label="Download full diagram as",
-                                    choices=[e for e in ct.FigureExtension],
-                                    selected=ct.PLOT_DEFAULTS.get("fig_extension"),
-                                ),
-                                ui.download_button(
-                                    id="download_full_diagram",
-                                    label="Download full diagram",
-                                    icon=fa.icon_svg("download"),
-                                    class_="btn btn-primary",
-                                ),
-                                views.create_selection(
-                                    id="prop_extension",
-                                    label=(
-                                        "Download properties as",
-                                        ui.popover(
-                                            ui.span(
-                                                fa.icon_svg(
-                                                    "circle-info",
-                                                    fill=ct.FILL_COLOUR,
-                                                ),
-                                                _add_ws=True,
-                                            ),
-                                            ui.markdown(
-                                                "Note that the vertices will always be saved as json, with key as cell IDs and values as vertices. "
-                                                "In the case of 3D, vertices are saved for each faces in a grain."
-                                            ),
-                                        ),
-                                    ),
-                                    choices=[e for e in ct.PropertyExtension],
-                                    selected=ct.PLOT_DEFAULTS.get("prop_extension"),
-                                ),
-                                ui.download_button(
-                                    id="download_diagram_property",
-                                    label="Download properties",
-                                    icon=fa.icon_svg("download"),
-                                    class_="btn btn-primary",
-                                ),
-                                ui.input_action_button(
-                                    id="reset_plot_options",
-                                    label="Reset plot options to defaults",
-                                    icon=fa.icon_svg("gear"),
-                                    class_="btn btn-primary",
-                                ),
-                                style="height: 100%; overflow: hidden;",
-                            ),
-                        ),
-                        ui.column(
-                            9,
-                            ui.card(
-                                ui.output_ui(
-                                    "display_diagram",
-                                ),
-                                style="height: 100%; overflow: hidden;",
-                                full_screen=True,
-                            ),
-                        ),
-                    ),
-                )
-            case ct.Tab.METRICS_AND_PLOTS:
-                return ui.tags.div(
-                    metrics,
-                    ui.card(
-                        ui.output_plot("vol_dist_plot"),
-                        style="height: 110%; overflow: hidden;",
-                    ),
-                )
-
-            case _:
-                raise ValueError(
-                    f"Invalid tab: {tab}; tab must be one of [{', '.join(ct.Tab)}]"
-                )
-
-    @render.ui
-    def gen_mic_tab() -> ui.Tag:
-        return get_tab(tab=ct.Tab.GEN_MIC)
-
-    @render.ui
-    def metrics_and_plots_tab() -> ui.Tag:
-        return get_tab(tab=ct.Tab.METRICS_AND_PLOTS)
+        else:
+            genmic.server("genmic", f, input.generate)
 
 
-app = App(app_ui, server, static_assets={"/": f"{pathlib.Path(__file__).parent}/www"})
+app = App(
+    app_ui,
+    server,
+    static_assets={"/": f"{pathlib.Path(__file__).parent}/www"},
+)
