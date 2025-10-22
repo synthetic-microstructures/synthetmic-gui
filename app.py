@@ -215,7 +215,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                             [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
                             [
                                 (input.single_phase_low, input.single_phase_high),
-                                (input.single_phase_std, input.single_phase_std),
+                                (input.single_phase_mean, input.single_phase_std),
                             ],
                         )
                     ),
@@ -247,7 +247,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                             [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
                             [
                                 (input.phase1_low, input.phase1_high),
-                                (input.phase1_std, input.phase1_std),
+                                (input.phase1_mean, input.phase1_std),
                             ],
                         )
                     ),
@@ -260,7 +260,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                             [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
                             [
                                 (input.phase2_low, input.phase2_high),
-                                (input.phase2_std, input.phase2_std),
+                                (input.phase2_mean, input.phase2_std),
                             ],
                         )
                     ),
