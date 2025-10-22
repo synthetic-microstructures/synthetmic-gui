@@ -14,6 +14,34 @@ from tabs import genmic
 APP_NAME: str = "SynthetMic-GUI"
 APP_VERSION: str = utils.get_app_version()
 
+
+def phase_input(n: int) -> ui.Tag:
+    return ui.row(
+        ui.column(
+            4,
+            views.create_dist_selection(
+                id=f"phase{n}_dist", label=f"Phase {n} volume distribution"
+            ),
+        ),
+        ui.column(
+            4,
+            ui.input_numeric(
+                id=f"phase{n}_n_grains",
+                label=f"Phase {n} number of grains",
+                value=500,
+            ),
+        ),
+        ui.column(
+            4,
+            ui.input_numeric(
+                id=f"phase{n}_vol_ratio",
+                label=f"Phase {n} volume ratio",
+                value=1,
+            ),
+        ),
+    )
+
+
 sidebar = ui.sidebar(
     ui.card(
         ui.card_header("Help center"),
@@ -27,7 +55,12 @@ sidebar = ui.sidebar(
         ),
     ),
     views.group_ui_elements(
-        ui.output_ui("space_dim"),
+        views.create_selection(
+            id="dim",
+            label="Choose a dimension",
+            choices=[d for d in ct.Dimension],
+            selected=ct.Dimension.THREE_D,
+        ),
         ui.output_ui("box_dim"),
         ui.output_ui("periodicity"),
         title="Box dimension",
@@ -40,7 +73,43 @@ sidebar = ui.sidebar(
             choices=[p for p in ct.Phase],
             selected=ct.Phase.SINGLE,
         ),
-        ui.output_ui("grain_vol_input"),
+        ui.panel_conditional(
+            f"input.phase === '{ct.Phase.SINGLE}'",
+            ui.tags.div(
+                ui.row(
+                    ui.column(
+                        6,
+                        ui.input_numeric(
+                            id="single_phase_n_grains",
+                            label="Number of grains",
+                            value=1000,
+                        ),
+                    ),
+                    ui.column(6, views.create_dist_selection(id="single_phase_dist")),
+                ),
+                ui.output_ui("single_phase_dist_param"),
+            ),
+        ),
+        ui.panel_conditional(
+            f"input.phase === '{ct.Phase.UPLOAD}'",
+            ui.tags.div(
+                views.create_upload_handler(
+                    "uploaded_volumes",
+                    "Upload volumes as a csv or txt file",
+                ),
+                ui.output_ui("uploaded_volumes_summary"),
+            ),
+        ),
+        ui.panel_conditional(
+            f"input.phase === '{ct.Phase.DUAL}'",
+            ui.tags.div(
+                phase_input(n=1),
+                ui.output_ui("phase1_dist_param"),
+                ui.hr(),
+                phase_input(n=2),
+                ui.output_ui("phase2_dist_param"),
+            ),
+        ),
         ui.output_text("volume_percentage_text"),
         title="Grains",
         help_text=views.grains_help_text(),
@@ -52,7 +121,29 @@ sidebar = ui.sidebar(
             choices=[i for i in ct.SeedInitializer],
             selected=ct.SeedInitializer.RANDOM,
         ),
-        ui.output_ui("seeds_input"),
+        ui.panel_conditional(
+            f"input.seeds_init === '{ct.SeedInitializer.RANDOM}'",
+            ui.tags.div(
+                ui.input_numeric(
+                    id="random_state",
+                    label="Seeds random state",
+                    value=None,  # type: ignore
+                ),
+                ui.help_text(
+                    "Seeds will be randomly generated in the specified box above."
+                ),
+            ),
+        ),
+        ui.panel_conditional(
+            f"input.seeds_init === '{ct.SeedInitializer.UPLOAD}'",
+            ui.tags.div(
+                views.create_upload_handler(
+                    "uploaded_seeds",
+                    "Uplaod seeds as a csv or txt file",
+                ),
+                ui.output_ui("uploaded_seeds_summary"),
+            ),
+        ),
         views.create_numeric_input(
             ["tol", "n_iter", "damp_param"],
             ["Volume tolerance", "Lloyd iterations", "Damp param"],
@@ -440,15 +531,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         )
 
     @render.ui
-    def space_dim() -> ui.Tag:
-        return views.create_selection(
-            id="dim",
-            label="Choose a dimension",
-            choices=[d for d in ct.Dimension],
-            selected=ct.Dimension.THREE_D,
-        )
-
-    @render.ui
     def uploaded_seeds_summary() -> ui.Tag:
         @render.table
         def seeds_summary_table() -> pd.DataFrame:
@@ -460,28 +542,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             )
 
         return ui.output_table("seeds_summary_table")
-
-    @render.ui
-    def seeds_input() -> ui.Tag:
-        if input.seeds_init() == ct.SeedInitializer.RANDOM:
-            return ui.tags.div(
-                ui.input_numeric(
-                    id="random_state",
-                    label="Seeds random state",
-                    value=None,  # type: ignore
-                ),
-                ui.help_text(
-                    "Seeds will be randomly generated in the specified box above."
-                ),
-            )
-
-        return ui.tags.div(
-            views.create_upload_handler(
-                "uploaded_seeds",
-                "Uplaod seeds as a csv or txt file",
-            ),
-            ui.output_ui("uploaded_seeds_summary"),
-        )
 
     @render.ui
     def single_phase_dist_param() -> ui.Tag:
@@ -507,69 +567,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             )
 
         return ui.output_table("volumes_summary_table")
-
-    @render.ui
-    def grain_vol_input() -> ui.Tag:
-        def phase_input(n: int) -> ui.Tag:
-            return ui.row(
-                ui.column(
-                    4,
-                    views.create_dist_selection(
-                        id=f"phase{n}_dist", label=f"Phase {n} volume distribution"
-                    ),
-                ),
-                ui.column(
-                    4,
-                    ui.input_numeric(
-                        id=f"phase{n}_n_grains",
-                        label=f"Phase {n} number of grains",
-                        value=500,
-                    ),
-                ),
-                ui.column(
-                    4,
-                    ui.input_numeric(
-                        id=f"phase{n}_vol_ratio",
-                        label=f"Phase {n} volume ratio",
-                        value=1,
-                    ),
-                ),
-            )
-
-        if input.phase() == ct.Phase.SINGLE:
-            ins = [
-                ui.row(
-                    ui.column(
-                        6,
-                        ui.input_numeric(
-                            id="single_phase_n_grains",
-                            label="Number of grains",
-                            value=1000,
-                        ),
-                    ),
-                    ui.column(6, views.create_dist_selection(id="single_phase_dist")),
-                ),
-                ui.output_ui("single_phase_dist_param"),
-            ]
-
-            return ui.tags.div(*ins)
-
-        elif input.phase() == ct.Phase.UPLOAD:
-            return ui.tags.div(
-                views.create_upload_handler(
-                    "uploaded_volumes",
-                    "Upload volumes as a csv or txt file",
-                ),
-                ui.output_ui("uploaded_volumes_summary"),
-            )
-
-        ins = []
-        for n in (1, 2):
-            ins.extend((phase_input(n), ui.output_ui(f"phase{n}_dist_param")))
-            if n == 1:
-                ins.append(ui.hr())
-
-        return ui.tags.div(*ins)
 
     @render.text
     def volume_percentage_text() -> str | None:
