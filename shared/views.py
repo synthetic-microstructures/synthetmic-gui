@@ -310,7 +310,7 @@ def create_dist_param(dist: str, id_prefix: str) -> ui.Tag:
                     defaults=[1, 0.35],
                 ),
                 ui.help_text(
-                    f"{text} volumes will be distibuted lorgnormally in with  mean 'Mean' standard deviation 'Std'."
+                    f"{text} volumes will be distibuted lorgnormally with  mean 'Mean' standard deviation 'Std'."
                 ),
             )
 
