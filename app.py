@@ -209,8 +209,31 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     iv.add_rule("damp_param", req_between(left=0.0, right=1.0))
     iv.add_rule("n_iter", req_int_gte(rhs=0))
 
+    def add_dist_param_to_iv(dist: str, id_prefix: str, **kwargs) -> dict:
+        match dist:
+            case ct.Distribution.UNIFORM:
+                iv.add_rule(f"{id_prefix}_low", req_gt(rhs=0))
+                iv.add_rule(f"{id_prefix}_high", req_gt(rhs=0))
+
+                return {
+                    k: v()
+                    for k, v in zip(("low", "high"), kwargs[ct.Distribution.UNIFORM])
+                }
+
+            case ct.Distribution.LOGNORMAL:
+                iv.add_rule(f"{id_prefix}_mean", req_gt(rhs=0))
+                iv.add_rule(f"{id_prefix}_std", req_gt(rhs=0))
+
+                return {
+                    k: v()
+                    for k, v in zip(("mean", "std"), kwargs[ct.Distribution.LOGNORMAL])
+                }
+
+            case _:
+                return {}
+
     # ------------------------------------------------------------------------------
-    # some helper functions for parsing inputs; will be reused
+    # some helper functions for parsing inputs
     # ------------------------------------------------------------------------------
     def parse_box_dim() -> tuple[float, ...]:
         box_dim = (input.length(), input.breadth())
@@ -254,33 +277,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     def _fitted_data() -> (
         tuple[utils.SynthetMicData, utils.LaguerreDiagramGenerator] | Exception
     ):
-        def add_dist_param_to_iv(dist: str, id_prefix: str, **kwargs) -> dict:
-            match dist:
-                case ct.Distribution.UNIFORM:
-                    iv.add_rule(f"{id_prefix}_low", req_gt(rhs=0))
-                    iv.add_rule(f"{id_prefix}_high", req_gt(rhs=0))
-
-                    return {
-                        k: v()
-                        for k, v in zip(
-                            ("low", "high"), kwargs[ct.Distribution.UNIFORM]
-                        )
-                    }
-
-                case ct.Distribution.LOGNORMAL:
-                    iv.add_rule(f"{id_prefix}_mean", req_gt(rhs=0))
-                    iv.add_rule(f"{id_prefix}_std", req_gt(rhs=0))
-
-                    return {
-                        k: v()
-                        for k, v in zip(
-                            ("mean", "std"), kwargs[ct.Distribution.LOGNORMAL]
-                        )
-                    }
-
-                case _:
-                    return {}
-
         state_vars = {}
 
         box_dim = parse_box_dim()
@@ -306,7 +302,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                             [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
                             [
                                 (input.single_phase_low, input.single_phase_high),
-                                (input.single_phase_std, input.single_phase_std),
+                                (input.single_phase_mean, input.single_phase_std),
                             ],
                         )
                     ),
@@ -338,7 +334,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                             [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
                             [
                                 (input.phase1_low, input.phase1_high),
-                                (input.phase1_std, input.phase1_std),
+                                (input.phase1_mean, input.phase1_std),
                             ],
                         )
                     ),
@@ -351,7 +347,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                             [ct.Distribution.UNIFORM, ct.Distribution.LOGNORMAL],
                             [
                                 (input.phase2_low, input.phase2_high),
-                                (input.phase2_std, input.phase2_std),
+                                (input.phase2_mean, input.phase2_std),
                             ],
                         )
                     ),
