@@ -284,7 +284,10 @@ def group_ui_elements(
     )
 
 
-def create_dist_param(dist: str, id_prefix: str) -> ui.Tag:
+def create_dist_param(
+    dist: str,
+    id_prefix: str,
+) -> ui.Tag:
     text = f"{dist} distribution selected;"
     match dist:
         case ct.Distribution.CONSTANT:
@@ -306,11 +309,13 @@ def create_dist_param(dist: str, id_prefix: str) -> ui.Tag:
             return ui.tags.div(
                 create_numeric_input(
                     ids=[f"{id_prefix}_{p}" for p in ("mean", "std")],
-                    labels=["Mean", "Std"],
+                    labels=["ECD mean", "ECD Std"],
                     defaults=[1, 0.35],
                 ),
                 ui.help_text(
-                    f"{text} volumes will be distibuted lorgnormally with  mean 'Mean' standard deviation 'Std'."
+                    f"""{text} Equivalent Circle Diameters (ECDs) will be sampled from
+                    a lorgnormal distribution with mean 'ECD mean' and standard deviation 'ECD std'.
+                    """
                 ),
             )
 

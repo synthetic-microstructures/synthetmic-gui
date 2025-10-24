@@ -607,6 +607,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             views.create_error_notification(str(f))
 
         else:
+            ui.update_sidebar(id="sidebar", show=False)
             genmic.server("genmic", f, input.generate)
 
 
