@@ -414,7 +414,7 @@ def server(
 
         @render.ui
         def display_diagram():
-            return ui.HTML(diagram.plotter.export_html(filename=None).read())  # type: ignore
+            return ui.HTML(diagram.plotter.export_html(filename=None).read())
 
         @render.download(
             filename=lambda: f"synthetmic-gui-output-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",

@@ -218,7 +218,7 @@ def generate_clip_diagram(
         colorby=colorby,
     )
     clips = mesh.clip(
-        normal=clip_normal,  # type: ignore
+        normal=clip_normal,
         origin=(
             0,
             0,
@@ -236,7 +236,7 @@ def generate_clip_diagram(
         window_size=list(window_size),
     )
     pl.add_mesh(
-        clips[0],  # type: ignore
+        clips[0],
         label="Clipped",
         show_edges=True,
         show_scalar_bar=False,
@@ -249,7 +249,7 @@ def generate_clip_diagram(
 
     if add_remains_as_wireframe:
         pl.add_mesh(
-            clips[1],  # type: ignore
+            clips[1],
             style="wireframe",
             label="Remains",
             show_scalar_bar=False,
@@ -274,7 +274,7 @@ def generate_clip_diagram(
         positions=generator.get_positions(),
         plotter=pl,
         mesh=mesh,
-        clips=clips,  # type: ignore
+        clips=clips,
     )
 
 
@@ -390,7 +390,7 @@ def generate_slice_diagram(
         )
 
     domain_map = dict(zip(COORDINATES, data.domain))
-    domain = _map_normal_to_domain(slice_normal, domain_map)  # type: ignore
+    domain = _map_normal_to_domain(slice_normal, domain_map)
 
     a, b = domain_map[slice_normal]
     if not (a <= slice_value <= b):
@@ -401,10 +401,10 @@ def generate_slice_diagram(
     periodic = None
     if data.periodic is not None:
         periodic_map = dict(zip(COORDINATES, data.periodic))
-        periodic = _map_normal_to_periodic(slice_normal, periodic_map)  # type: ignore
+        periodic = _map_normal_to_periodic(slice_normal, periodic_map)
 
     seeds_map = dict(zip(COORDINATES, generator.get_positions().T))
-    seeds = _map_normal_to_seeds(slice_normal, seeds_map)  # type: ignore
+    seeds = _map_normal_to_seeds(slice_normal, seeds_map)
 
     omega = ConvexPolyhedraAssembly()
     mins = domain[:, 0].copy()
@@ -444,7 +444,7 @@ def generate_slice_diagram(
 
     # note: base target and fitted volumes are used
     mesh, clim = prepare_mesh(
-        mesh=mesh,  # type: ignore
+        mesh=mesh,
         target_volumes=data.volumes,
         fitted_volumes=generator.get_fitted_volumes(),
         colorby=colorby,
@@ -455,7 +455,7 @@ def generate_slice_diagram(
         window_size=list(window_size),
     )
     pl.add_mesh(
-        mesh,  # type: ignore
+        mesh,
         show_edges=True,
         show_scalar_bar=False,
         lighting=False,
@@ -467,7 +467,7 @@ def generate_slice_diagram(
     pl.camera_position = "xy"
 
     vertices = {}
-    offsets, coords = pd.cell_polyhedra()  # type: ignore
+    offsets, coords = pd.cell_polyhedra()
     for i in range(len(offsets) - 1):
         s, e = offsets[i : i + 2]
         vertices[i] = coords[s:e].tolist()
@@ -480,9 +480,9 @@ def generate_slice_diagram(
         weights=weights,
         domain=domain,
         seeds=seeds,
-        positions=pd.get_positions(),  # type: ignore
+        positions=pd.get_positions(),
         plotter=pl,
-        mesh=mesh,  # type: ignore
+        mesh=mesh,
     )
 
 
@@ -567,7 +567,7 @@ def between(
         return left <= x <= right
 
     return lambda x: (
-        None if (rule(x) or x is None) else f"Must be between {left} and {right}"  # type: ignore
+        None if (rule(x) or x is None) else f"Must be between {left} and {right}"
     )
 
 
@@ -589,7 +589,7 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
 
     property_dict["domain"] = pd.DataFrame(
         data=diagram.domain,
-        columns=["a", "b"],  # type: ignore
+        columns=["a", "b"],
     )
 
     for p, d in zip(
@@ -604,7 +604,7 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
             diagram.centroids,
         ),
     ):
-        property_dict[p] = pd.DataFrame(data=d[:, :dim], columns=COORDINATES[:dim])  # type: ignore
+        property_dict[p] = pd.DataFrame(data=d[:, :dim], columns=COORDINATES[:dim])
 
     props = ("weights", "fitted_volumes")
     data = (diagram.weights, diagram.fitted_volumes)
@@ -616,7 +616,7 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
     for p, d in zip(props, data):
         property_dict[p] = pd.DataFrame(
             data=d,
-            columns=["weights"] if p == "weights" else [VOLUMES],  # type: ignore
+            columns=["weights"] if p == "weights" else [VOLUMES],
         )
 
     return property_dict
@@ -728,7 +728,7 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
             )
             out_values, out_bins, _ = ax.hist(
                 num_vertices_list,
-                bins=bins,  # type: ignore
+                bins=bins,
                 color=FILL_COLOUR,
                 alpha=ALPHA,
                 ec=EC,
@@ -741,7 +741,7 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
         ax.set_title(k.replace("_", " ").capitalize())
         ax.spines[["top", "right"]].set_visible(False)
 
-        plot_data[k] = {"bins": out_bins.tolist(), "bin_values": out_values.tolist()}  # type: ignore
+        plot_data[k] = {"bins": out_bins.tolist(), "bin_values": out_values.tolist()}
 
     return Metrics(
         fig=fig,
@@ -971,15 +971,15 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
     space_dim = len(data.domain)
     dimension = pd.DataFrame(
         data=[data.domain[:, 1] - data.domain[:, 0]],
-        columns=("length", "breadth", "height")[:space_dim],  # type: ignore
+        columns=("length", "breadth", "height")[:space_dim],
     )
     seeds = pd.DataFrame(
         data=data.seeds,
-        columns=COORDINATES[:space_dim],  # type: ignore
+        columns=COORDINATES[:space_dim],
     )
     volumes = pd.DataFrame(
         data=data.volumes,
-        columns=(VOLUMES,),  # type: ignore
+        columns=(VOLUMES,),
     )
 
     zip_buffer = io.BytesIO()
@@ -1017,6 +1017,6 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
 
 def load_image(image_path: pathlib.Path) -> ImgData:
     img: ImgData = {
-        "src": image_path,  # type: ignore
+        "src": image_path,
     }
     return img

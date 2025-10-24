@@ -127,7 +127,7 @@ sidebar = ui.sidebar(
                 ui.input_numeric(
                     id="random_state",
                     label="Seeds random state",
-                    value=None,  # type: ignore
+                    value=None,
                 ),
                 ui.help_text(
                     "Seeds will be randomly generated in the specified box above."
@@ -261,14 +261,14 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     def _() -> None:
         file: list[FileInfo] | None = input.uploaded_seeds()
         if file is not None:
-            _uploaded_seeds.set(pd.read_csv(file[0]["datapath"]))  # type: ignore
+            _uploaded_seeds.set(pd.read_csv(file[0]["datapath"]))
 
     @reactive.effect
     def _() -> None:
         file: list[FileInfo] | None = input.uploaded_volumes()
 
         if file is not None:
-            _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))  # type: ignore
+            _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))
 
     views.info_modal(APP_NAME)
 
@@ -313,7 +313,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                     volumes = utils.sample_single_phase_vols(
                         input.single_phase_dist(),
                         input.single_phase_n_grains(),
-                        state_vars["domain_vol"],  # type: ignore
+                        state_vars["domain_vol"],
                         space_dim=state_vars["space_dim"],
                         **kwargs,
                     )
@@ -359,7 +359,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                         (input.phase1_dist(), input.phase2_dist()),
                         (input.phase1_n_grains(), input.phase2_n_grains()),
                         (input.phase1_vol_ratio(), input.phase2_vol_ratio()),
-                        state_vars["domain_vol"],  # type: ignore
+                        state_vars["domain_vol"],
                         state_vars["space_dim"],
                         (phase1_kwargs, phase2_kwargs),
                     )
@@ -379,7 +379,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
 
                     # validate the volumes
                     val_out = utils.validate_df(
-                        _uploaded_volumes(),  # type: ignore
+                        _uploaded_volumes(),
                         expected_colnames=[utils.VOLUMES],
                         expected_dim=None,
                         expected_type="float",
@@ -391,7 +391,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
 
                     # check if domain volume is close to the sum of the uploaded volumes.
                     VOL_DIFF_TOL = 1e-6
-                    volumes = _uploaded_volumes()[  # type: ignore
+                    volumes = _uploaded_volumes()[
                         utils.VOLUMES
                     ].values  # get the underlying numpy array
                     diff = abs(volumes.sum() - state_vars["domain_vol"])
@@ -421,7 +421,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                 _, seeds = utils.sample_seeds(
                     state_vars["n_grains"],
                     input.random_state(),
-                    *state_vars["box_dim"],  # type: ignore
+                    *state_vars["box_dim"],
                 )
                 state_vars["seeds"] = seeds
 
@@ -431,8 +431,8 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
 
                 # validate the seeds
                 val_out = utils.validate_df(
-                    _uploaded_seeds(),  # type: ignore
-                    expected_colnames=list(utils.COORDINATES)[  # type: ignore
+                    _uploaded_seeds(),
+                    expected_colnames=list(utils.COORDINATES)[
                         : state_vars["space_dim"]
                     ],
                     expected_dim=(
@@ -453,7 +453,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
 
                 # add domain and seeds to state_vars since they have been uploaded
                 seeds = _uploaded_seeds()
-                state_vars["seeds"] = seeds.values  # type: ignore  # get the underlying numpy array
+                state_vars["seeds"] = seeds.values  # get the underlying numpy array
 
             case _:
                 return Exception(
@@ -530,7 +530,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     def uploaded_seeds_summary() -> ui.Tag:
         @render.table
         def seeds_summary_table() -> pd.DataFrame:
-            return utils.summarize_df(_uploaded_seeds())  # type: ignore
+            return utils.summarize_df(_uploaded_seeds())
 
         if _uploaded_seeds() is None:
             return ui.help_text(
@@ -555,7 +555,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     def uploaded_volumes_summary() -> ui.Tag:
         @render.table
         def volumes_summary_table() -> pd.DataFrame:
-            return utils.summarize_df(_uploaded_volumes())  # type: ignore
+            return utils.summarize_df(_uploaded_volumes())
 
         if _uploaded_volumes() is None:
             return ui.help_text(
