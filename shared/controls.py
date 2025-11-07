@@ -12,6 +12,7 @@ class ExampleDataName(StrEnum):
     MIDDLE = auto()
     DP = auto()
     LOGNORMAL = auto()
+    EBSD = auto()
 
 
 class Colorby(StrEnum):
@@ -28,7 +29,7 @@ class DocSize(StrEnum):
 
 class Tab(StrEnum):
     MICRO = "Microstructure"
-    METRICS = "Metrics"
+    METRICS = "Statistics"
 
 
 class Dimension(StrEnum):

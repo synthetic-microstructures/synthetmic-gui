@@ -4,7 +4,7 @@ import faicons as fa
 from shiny import ui
 
 import shared.controls as ct
-from shared.utils import COORDINATES, VOLUMES
+from shared.utils import COORDINATES, VOLUMES, format_to_standard_form, qp
 
 
 def create_download_button(id: str, label: str, icon: str = "download") -> ui.Tag:
@@ -458,6 +458,14 @@ def create_example_data_card(
                 """
             tags = "3D, RVE, lognormal volumes, banded structure, "
 
+        case ct.ExampleDataName.EBSD:
+            info = """
+            In this example we fit a Laguerre diagram to an EBSD image of a single-phase steel. The 'target volumes'
+            are the areas of the grains in the EBSD image. The 'seeds' are the centroids of the grains
+            in the EBSD image. The EBSD data is taken from this [paper](https://doi.org/10.1051/m2an/2025004).
+            """
+            tags = "2D, non-periodic, volume upload, seed upload, volume tolerance = 1, Lloyd iterations = 0, damp param = 1"
+
         case _:
             raise ValueError(
                 f"Invalid data name '{name}'; name must be one of [{', '.join(ct.ExampleDataName)}]."
@@ -467,9 +475,25 @@ def create_example_data_card(
         ui.card_header(name),
         ui.output_image(image_id, fill=True, height="100%", width="100%"),
         ui.markdown(info),
-        ui.help_text(f"Tags: {tags}{common_tags}"),
+        ui.help_text(
+            f"Tags: {tags}{'' if name == ct.ExampleDataName.EBSD else common_tags}"
+        ),
         create_download_button(
             id=download_id,
             label="Download data",
         ),
     )
+
+
+def compute_d90_text(mean: float, std: float) -> str | None:
+    text = """
+            D90 for the lognormal distribution of ECDs with mean {}
+            and std {} is {}. 
+            """
+    if any([i is None for i in (mean, std)]) or mean == 0:
+        return
+
+    d90 = qp(mean=mean, std=std, p=0.9)
+    d90 = format_to_standard_form(d90, precision=2)
+
+    return text.format(mean, std, d90)

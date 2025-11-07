@@ -346,38 +346,44 @@ def server(
 
         for t, v in zip(
             [
-                "Max percentage error",
-                "Mean percentage error",
-                "Sum of target volumes",
-                "Sum of fitted volumes",
+                "Max volume % error",
+                "Mean volume % error",
+                "Mean of fitted of volumes",
+                "Standard deviation of fitted of volumes",
+                "90th percentile of fitted volumes",
+                "Mean of ECDs",
+                "Standard deviation of ECDs",
+                "90th percentile of ECDs",
             ],
             [
                 metrics.max_percentage_error,
                 metrics.mean_percentage_error,
-                metrics.target_volumes_sum,
-                metrics.fitted_volumes_sum,
+                metrics.fitted_volumes_mean,
+                metrics.fitted_volumes_std,
+                metrics.fitted_volumes_90_percentile,
+                metrics.ecds_mean,
+                metrics.ecds_std,
+                metrics.ecds_d90,
             ],
         ):
             if isinstance(v, float):
-                if t in (
-                    "Max percentage error",
-                    "Mean percentage error",
-                ):
-                    v_formated = utils.format_to_standard_form(v, 2)
-                else:
-                    v_formated = f"{v:.2f}"
+                # if t in (
+                #     "Max percentage error",
+                #     "Mean percentage error",
+                # ):
 
+                v_formated = utils.format_to_standard_form(v, 2)
             elif v is None:
                 v_formated = "NA"
-            else:
-                v_formated = v
 
             stats.append(
                 ui.value_box(
                     title=t,
                     value=v_formated,
                     full_screen=False,
-                    showcase=faicons.icon_svg("magnifying-glass"),
+                    height="160px",
+                    width="15px",
+                    showcase=faicons.icon_svg("square-poll-horizontal"),
                 )
             )
 
@@ -396,7 +402,9 @@ def server(
             )
 
         return ui.tags.div(
-            ui.layout_column_wrap(*stats),
+            ui.row(*[ui.column(3, s) for s in stats[:4]]),
+            ui.row(*[ui.column(3, s) for s in stats[4:]]),
+            # ui.layout_column_wrap(*stats),
             ui.card(
                 ui.output_plot("plot_metrics"),
                 download_popover,

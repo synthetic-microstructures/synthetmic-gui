@@ -15,6 +15,7 @@ import pandas as pd
 import pyvista as pv
 from matplotlib.figure import Figure
 from pysdot import ConvexPolyhedraAssembly, PowerDiagram
+from scipy.stats import norm
 from shiny.types import ImgData
 from synthetmic import LaguerreDiagramGenerator
 from synthetmic.data import paper
@@ -53,6 +54,12 @@ class Metrics:
     fig: Figure
     plot_data: dict[str, dict[str, list]]
     fitted_volumes_sum: float
+    fitted_volumes_mean: np.ndarray
+    fitted_volumes_std: np.ndarray
+    fitted_volumes_90_percentile: np.ndarray
+    ecds_mean: np.ndarray
+    ecds_std: np.ndarray
+    ecds_d90: np.ndarray
     target_volumes_sum: float | None = None
     mean_percentage_error: float | None = None
     max_percentage_error: float | None = None
@@ -68,7 +75,6 @@ def sample_single_phase_vols(
     match dist:
         case Distribution.CONSTANT:
             rel_vol = np.ones(n_grains) / n_grains
-
             return rel_vol * domain_vol
 
         case Distribution.UNIFORM:
@@ -636,6 +642,20 @@ def calculate_num_vertices_3d(
     return res
 
 
+def calculate_ecds(volumes: np.ndarray, space_dim: int) -> np.ndarray:
+    match space_dim:
+        case 2:
+            return 2 * np.sqrt((volumes / np.pi))
+
+        case 3:
+            return 2 * (volumes * 3 / 4 / np.pi) ** (1 / 3)
+
+        case _:
+            raise ValueError(
+                f"Invalid space_dim '{space_dim}'. Value must be either 2 or 3"
+            )
+
+
 def calculate_metrics(diagram: Diagram) -> Metrics:
     fig = plt.figure()
 
@@ -743,6 +763,7 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
 
         plot_data[k] = {"bins": out_bins.tolist(), "bin_values": out_values.tolist()}
 
+    ecds = calculate_ecds(volumes=diagram.fitted_volumes, space_dim=space_dim)
     return Metrics(
         fig=fig,
         plot_data=plot_data,
@@ -750,6 +771,12 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
         target_volumes_sum=target_volumes_sum,
         mean_percentage_error=mean_percentage_error,
         max_percentage_error=max_percentage_error,
+        fitted_volumes_mean=diagram.fitted_volumes.mean(),
+        fitted_volumes_std=diagram.fitted_volumes.std(),
+        fitted_volumes_90_percentile=np.percentile(diagram.fitted_volumes, q=90),
+        ecds_mean=ecds.mean(),
+        ecds_std=ecds.std(),
+        ecds_d90=np.percentile(ecds, q=90),
     )
 
 
@@ -963,6 +990,23 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
         case ExampleDataName.LOGNORMAL:
             data = paper.create_example5p5_data(is_periodic=False)
 
+        case ExampleDataName.EBSD:
+            ebsd_df = {}
+            for d in ("dimension", "seeds", "volumes"):
+                df = pd.read_csv(
+                    pathlib.Path().resolve() / "assets" / "data" / f"ebsd_{d}.csv",
+                    index_col=False,
+                )
+                ebsd_df[d] = df
+
+            data = SynthetMicData(
+                seeds=ebsd_df["seeds"].values,
+                volumes=ebsd_df["volumes"]["volumes"].values,
+                domain=np.array([[0, i] for i in ebsd_df["dimension"].values[0]]),
+                periodic=None,
+                init_weights=None,
+            )
+
         case _:
             raise ValueError(
                 f"Invalid data name '{name}'; name must be one of [{', '.join(ExampleDataName)}]."
@@ -1020,3 +1064,15 @@ def load_image(image_path: pathlib.Path) -> ImgData:
         "src": image_path,
     }
     return img
+
+
+def qp(mean: float, std: float, p: float = 0.9) -> float:
+    # Function to return the p-th percentile for the log normal distribution
+    # whose mean and standard deviation are mean and std
+    # scipy.stats.norm.ppf(p) gives $\Phi^{-1}(p)$
+
+    return (
+        mean**2
+        * np.exp(norm.ppf(p) * np.sqrt(np.log(1 + std**2 / mean**2)))
+        / np.sqrt(mean**2 + std**2)
+    )
