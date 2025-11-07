@@ -50,7 +50,7 @@ sidebar = ui.sidebar(
         ),
         views.create_input_action_button(
             id="show_how_modal",
-            label="Click to see how to use this app and download starting point data",
+            label="Click here for help and to see some examples",
             icon="lightbulb",
         ),
     ),
@@ -110,6 +110,7 @@ sidebar = ui.sidebar(
                 ui.output_ui("phase2_dist_param"),
             ),
         ),
+        ui.output_text("d90_text"),
         ui.output_text("volume_percentage_text"),
         title="Grains",
         help_text=views.grains_help_text(),
@@ -493,7 +494,10 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     @render.image
     def example_data_image() -> ImgData:
         return utils.load_image(
-            pathlib.Path().resolve() / "assets" / f"{input.example_data()}.png",
+            pathlib.Path().resolve()
+            / "assets"
+            / "imgs"
+            / f"{input.example_data()}.png",
         )
 
     @render.ui
@@ -588,6 +592,30 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             f"Phase 1 volume percentage is {phase1_vol_percent:.2f}%; Phase 2 volume percentage is {100.0 - phase1_vol_percent:.2f}% "
             "of the domain volume."
         )
+
+    @render.text
+    def d90_text() -> str | None:
+        if (
+            input.phase() == ct.Phase.SINGLE
+            and input.single_phase_dist() == ct.Distribution.LOGNORMAL
+        ):
+            return views.compute_d90_text(
+                mean=input.single_phase_mean(), std=input.single_phase_std()
+            )
+
+        if input.phase() == ct.Phase.DUAL:
+            msg = []
+            for i, p in enumerate((input.phase1_dist(), input.phase2_dist()), start=1):
+                if p == ct.Distribution.LOGNORMAL:
+                    text = views.compute_d90_text(
+                        mean=getattr(input, f"phase{i}_mean")(),
+                        std=getattr(input, f"phase{i}_std")(),
+                    )
+                    if text is not None:
+                        msg.append(f"Phase {i} {text}")
+
+            if msg:
+                return " ".join(msg)
 
     @reactive.effect
     @reactive.event(input.show_how_modal)
