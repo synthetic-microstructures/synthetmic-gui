@@ -119,8 +119,8 @@ def grains_help_text() -> ui.HTML:
         boundaries of the distribution such that the generated values
         will always fall between them.
 
-        In case of normal and lognormal distributions, the **Mean** and
-        **Std** are, respectively, the mean and standard deviation
+        In case of lognormal distributions, the **ECD Mean** and
+        **ECD Std** are, respectively, the mean and standard deviation
         of the corresponding distributions.
 
         In all distribution cases, sampled values are scaled such that their sum equals the volume
@@ -309,7 +309,7 @@ def create_dist_param(
             return ui.tags.div(
                 create_numeric_input(
                     ids=[f"{id_prefix}_{p}" for p in ("mean", "std")],
-                    labels=["ECD mean", "ECD Std"],
+                    labels=["ECD Mean", "ECD Std"],
                     defaults=[1, 0.35],
                 ),
                 ui.help_text(
