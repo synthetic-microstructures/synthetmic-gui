@@ -343,14 +343,15 @@ def server(
         )
 
         stats = []
+        stats_suffix = {2: "areas", 3: "volumes"}
 
         for t, v in zip(
             [
                 "Max volume % error",
                 "Mean volume % error",
-                "Mean of fitted of volumes",
-                "Standard deviation of fitted of volumes",
-                "90th percentile of fitted volumes",
+                f"Mean of fitted {stats_suffix[metrics.space_dim]}",
+                f"Standard deviation of fitted {stats_suffix[metrics.space_dim]}",
+                f"90th percentile of fitted {stats_suffix[metrics.space_dim]}",
                 "Mean of ECDs",
                 "Standard deviation of ECDs",
                 "90th percentile of ECDs",
@@ -367,14 +368,12 @@ def server(
             ],
         ):
             if isinstance(v, float):
-                # if t in (
-                #     "Max percentage error",
-                #     "Mean percentage error",
-                # ):
-
                 v_formated = utils.format_to_standard_form(v, 2)
             elif v is None:
                 v_formated = "NA"
+
+            else:
+                v_formated = v
 
             stats.append(
                 ui.value_box(
@@ -404,7 +403,6 @@ def server(
         return ui.tags.div(
             ui.row(*[ui.column(3, s) for s in stats[:4]]),
             ui.row(*[ui.column(3, s) for s in stats[4:]]),
-            # ui.layout_column_wrap(*stats),
             ui.card(
                 ui.output_plot("plot_metrics"),
                 download_popover,
