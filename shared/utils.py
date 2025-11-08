@@ -51,16 +51,15 @@ class Diagram:
 
 @dataclass(frozen=True)
 class Metrics:
+    space_dim: int
     fig: Figure
     plot_data: dict[str, dict[str, list]]
-    fitted_volumes_sum: float
     fitted_volumes_mean: np.ndarray
     fitted_volumes_std: np.ndarray
     fitted_volumes_90_percentile: np.ndarray
     ecds_mean: np.ndarray
     ecds_std: np.ndarray
     ecds_d90: np.ndarray
-    target_volumes_sum: float | None = None
     mean_percentage_error: float | None = None
     max_percentage_error: float | None = None
 
@@ -206,7 +205,7 @@ def generate_clip_diagram(
 ) -> Diagram:
     if clip_normal not in COORDINATES:
         raise ValueError(
-            f"Invalid for slice_normal: {clip_normal}. Value must be one of {COORDINATES}."
+            f"Invalid for clip_normal: {clip_normal}. Value must be one of {COORDINATES}."
         )
 
     domain_map = dict(zip(COORDINATES, data.domain))
@@ -663,7 +662,6 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
         errors = np.array([])
         mean_percentage_error = None
         max_percentage_error = None
-        target_volumes_sum = None
     else:
         errors = (
             np.abs(diagram.target_volumes - diagram.fitted_volumes)
@@ -672,7 +670,6 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
         )
         mean_percentage_error = errors.mean()
         max_percentage_error = errors.max()
-        target_volumes_sum = diagram.target_volumes.sum()
 
     ALPHA = 0.75
     EC = "black"
@@ -763,17 +760,16 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
 
         plot_data[k] = {"bins": out_bins.tolist(), "bin_values": out_values.tolist()}
 
-    ecds = calculate_ecds(volumes=diagram.fitted_volumes, space_dim=space_dim)
+    ecds = calculate_ecds(volumes=non_zero_grain_size, space_dim=space_dim)
     return Metrics(
+        space_dim=space_dim,
         fig=fig,
         plot_data=plot_data,
-        fitted_volumes_sum=diagram.fitted_volumes.sum(),
-        target_volumes_sum=target_volumes_sum,
         mean_percentage_error=mean_percentage_error,
         max_percentage_error=max_percentage_error,
-        fitted_volumes_mean=diagram.fitted_volumes.mean(),
-        fitted_volumes_std=diagram.fitted_volumes.std(),
-        fitted_volumes_90_percentile=np.percentile(diagram.fitted_volumes, q=90),
+        fitted_volumes_mean=non_zero_grain_size.mean(),
+        fitted_volumes_std=non_zero_grain_size.std(),
+        fitted_volumes_90_percentile=np.percentile(non_zero_grain_size, q=90),
         ecds_mean=ecds.mean(),
         ecds_std=ecds.std(),
         ecds_d90=np.percentile(ecds, q=90),
