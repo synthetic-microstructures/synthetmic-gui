@@ -343,15 +343,17 @@ def server(
         )
 
         stats = []
-        stats_suffix = {2: "areas", 3: "volumes"}
 
+        measure = utils.get_domain_measure(
+            space_dim=metrics.space_dim, title=False, plural=True
+        )
         for t, v in zip(
             [
                 "Max volume % error",
                 "Mean volume % error",
-                f"Mean of fitted {stats_suffix[metrics.space_dim]}",
-                f"Standard deviation of fitted {stats_suffix[metrics.space_dim]}",
-                f"90th percentile of fitted {stats_suffix[metrics.space_dim]}",
+                f"Mean of fitted {measure}",
+                f"Standard deviation of fitted {measure}",
+                f"90th percentile of fitted {measure}",
                 "Mean of ECDs",
                 "Standard deviation of ECDs",
                 "90th percentile of ECDs",

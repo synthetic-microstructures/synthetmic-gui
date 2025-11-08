@@ -641,18 +641,38 @@ def calculate_num_vertices_3d(
     return res
 
 
+def check_space_dim(space_dim: int) -> None:
+    if space_dim not in (2, 3):
+        raise ValueError(
+            f"Invalid space_dim '{space_dim}'. Value must be either 2 or 3"
+        )
+
+    return None
+
+
 def calculate_ecds(volumes: np.ndarray, space_dim: int) -> np.ndarray:
-    match space_dim:
-        case 2:
-            return 2 * np.sqrt((volumes / np.pi))
+    check_space_dim(space_dim)
 
-        case 3:
-            return 2 * (volumes * 3 / 4 / np.pi) ** (1 / 3)
+    if space_dim == 2:
+        return 2 * np.sqrt((volumes / np.pi))
 
-        case _:
-            raise ValueError(
-                f"Invalid space_dim '{space_dim}'. Value must be either 2 or 3"
-            )
+    return 2 * (volumes * 3 / 4 / np.pi) ** (1 / 3)
+
+
+def get_domain_measure(
+    space_dim: int, title: bool = False, plural: bool = False
+) -> str:
+    check_space_dim(space_dim)
+
+    measure = "area" if space_dim == 2 else "volume"
+
+    if plural:
+        measure = f"{measure}s"
+
+    if title:
+        measure = measure.title()
+
+    return measure
 
 
 def calculate_metrics(diagram: Diagram) -> Metrics:
@@ -676,10 +696,7 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
     PRECISION = 8
 
     space_dim = diagram.seeds.shape[1]
-    if space_dim == 2:
-        ftitle = "Area"
-    else:
-        ftitle = "Volume"
+    ftitle = get_domain_measure(space_dim=space_dim, title=True, plural=False)
 
     non_zero_grain_ids = diagram.fitted_volumes.nonzero()[0]
     non_zero_grain_size = diagram.fitted_volumes[non_zero_grain_ids]
@@ -720,6 +737,8 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
             ax.set_ylabel("Normalized frequency")
 
         else:
+            check_space_dim(space_dim)
+
             num_vertices_list = []
 
             if space_dim == 2:
@@ -728,13 +747,9 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
                 ]:
                     num_vertices_list.append(len(v))
 
-            elif space_dim == 3:
+            else:
                 num_vertices_list = calculate_num_vertices_3d(
                     diagram.vertices, precision=PRECISION
-                )
-            else:
-                raise ValueError(
-                    f"invalid space_dim: {space_dim}; value must be 2 or 3."
                 )
 
             min_n, max_n = min(num_vertices_list), max(num_vertices_list)
