@@ -345,15 +345,15 @@ def server(
         stats = []
 
         measure = utils.get_domain_measure(
-            space_dim=metrics.space_dim, title=False, plural=True
+            space_dim=metrics.space_dim, title=False, plural=False
         )
         for t, v in zip(
             [
-                "Max volume % error",
-                "Mean volume % error",
-                f"Mean of fitted {measure}",
-                f"Standard deviation of fitted {measure}",
-                f"90th percentile of fitted {measure}",
+                f"Max {measure} % error",
+                f"Mean {measure} % error",
+                f"Mean of grain {measure}s",
+                f"Standard deviation of grain {measure}s",
+                f"90th percentile of grain {measure}s",
                 "Mean of ECDs",
                 "Standard deviation of ECDs",
                 "90th percentile of ECDs",
@@ -382,8 +382,6 @@ def server(
                     title=t,
                     value=v_formated,
                     full_screen=False,
-                    height="160px",
-                    width="15px",
                     showcase=faicons.icon_svg("square-poll-horizontal"),
                 )
             )
@@ -403,8 +401,8 @@ def server(
             )
 
         return ui.tags.div(
-            ui.row(*[ui.column(3, s) for s in stats[:4]]),
-            ui.row(*[ui.column(3, s) for s in stats[4:]]),
+            ui.row(ui.layout_column_wrap(*stats[:4])),
+            ui.row(ui.layout_column_wrap(*stats[4:])),
             ui.card(
                 ui.output_plot("plot_metrics"),
                 download_popover,
