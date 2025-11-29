@@ -2197,7 +2197,7 @@ wheels = [
 
 [[package]]
 name = "synthetmic"
-version = "0.1.4"
+version = "0.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
@@ -2207,14 +2207,14 @@ dependencies = [
     { name = "scipy" },
     { name = "vtk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/71/9b/862b14c24b7c68ac1e5a98ad5618c324a24d478eab6573b67b8361a4d007/synthetmic-0.1.4.tar.gz", hash = "sha256:3f4cb6986b62addfc493ddea85635b58eb2b48b40b495d18834c563f69c79868", size = 134197, upload-time = "2025-09-02T13:41:59.235Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/e1/d8a8ddc3334bafb39316f35438febea035f60ab2a1690f9bca0af2334448/synthetmic-0.1.5.tar.gz", hash = "sha256:66be3d6ebe050aa7eca075abb98527821240caa5164868e4ce0d924851080315", size = 134212, upload-time = "2025-11-29T22:49:04.877Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/21/451e419b0e847379725b82ea39ded219b6897a0d46ef50036822fb96dcdf/synthetmic-0.1.4-py3-none-any.whl", hash = "sha256:8f78b90a16ae11950d02456dc269a3e646e182acc8dc0c80dae27e104cf3e877", size = 18113, upload-time = "2025-09-02T13:41:58.062Z" },
+    { url = "https://files.pythonhosted.org/packages/14/27/e1c685e3254a830442af46e9009c5b75f47ede7e827e0ec9d7eb4da8449e/synthetmic-0.1.5-py3-none-any.whl", hash = "sha256:ccae949ef630a035975ce48c75d227fb93120b362883aeb97c77f5097aabfcbc", size = 18114, upload-time = "2025-11-29T22:49:03.703Z" },
 ]
 
 [[package]]
 name = "synthetmic-gui"
-version = "0.3.1"
+version = "0.3.2"
 source = { editable = "." }
 dependencies = [
     { name = "faicons" },
@@ -2242,7 +2242,7 @@ requires-dist = [
     { name = "shiny", specifier = "==1.4.0" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
     { name = "shinywidgets", specifier = ">=0.6.2" },
-    { name = "synthetmic", specifier = "==0.1.4" },
+    { name = "synthetmic", specifier = "==0.1.5" },
 ]
 provides-extras = ["tests"]
 

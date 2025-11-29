@@ -1,15 +1,23 @@
-from pathlib import Path
-
 import numpy as np
 import pytest
 from synthetmic import LaguerreDiagramGenerator
+from synthetmic.data import toy
+from synthetmic.data.utils import create_constant_volumes
 
 from shared.utils import fit_data
 
 
 @pytest.fixture
 def _seeds() -> np.ndarray:
-    return np.loadtxt(Path("assets", "data", "five_2d_seeds.csv"), delimiter=",")
+    return np.array(
+        [
+            [0.37454012, 0.15599452],
+            [0.95071431, 0.05808361],
+            [0.73199394, 0.86617615],
+            [0.59865848, 0.60111501],
+            [0.15601864, 0.70807258],
+        ]
+    )
 
 
 def test_verts_count(_seeds) -> None:
@@ -25,17 +33,13 @@ def test_verts_count(_seeds) -> None:
     )
 
     n_grains, space_dim = _seeds.shape
-
-    domain = np.array([[0, 1] for _ in range(space_dim)])
-    domain_vol = np.prod(domain[:, 1] - domain[:, 0])
-
-    volumes = (np.ones(n_grains) / n_grains) * domain_vol
+    domain, domain_volume = toy._create_unit_domain(space_dim=space_dim)
+    volumes = create_constant_volumes(n_grains=n_grains, domain_volume=domain_volume)
 
     periodic = [False] * space_dim
 
     pkg_generator.fit(seeds=_seeds, volumes=volumes, domain=domain, periodic=periodic)
     pkg_count = [len(v) for v in pkg_generator.get_vertices().values()]
-    # pkg_count.sort()
 
     _, gui_generator = fit_data(
         domain=domain,
@@ -47,7 +51,6 @@ def test_verts_count(_seeds) -> None:
         damp_param=damp_param,
     )
     gui_count = [len(v) for v in gui_generator.get_vertices().values()]
-    # gui_count.sort()
 
     print(pkg_count)
     print(gui_count)

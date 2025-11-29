@@ -500,7 +500,6 @@ def fit_data(
     n_iter: int,
     damp_param: float,
 ) -> tuple[SynthetMicData, LaguerreDiagramGenerator]:
-    print(tol, n_iter, damp_param)
     generator = LaguerreDiagramGenerator(
         tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=False
     )
@@ -512,11 +511,6 @@ def fit_data(
         init_weights=None,
     )
     generator.fit(**asdict(data))
-
-    verts = generator.get_vertices()
-
-    for k in verts.values():
-        print(len(k))
 
     return data, generator
 
