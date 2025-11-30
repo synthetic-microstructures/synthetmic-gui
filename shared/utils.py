@@ -438,7 +438,7 @@ def generate_slice_diagram(
         cartesian_periodic = list(itertools.product(*periodic_list))
 
         for rep in cartesian_periodic:
-            if rep != (0, 0, 0):
+            if rep != (0,) * seeds.shape[1]:
                 pd.add_replication(rep * lens)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".vtk", delete=True) as tmp_file:
