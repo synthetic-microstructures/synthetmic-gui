@@ -28,6 +28,15 @@ jobs:
     - name: Install the project
       run: uv sync --all-extras
 
+    - name: Run tests
+      run: uv run pytest -v tests
+
+    - name: Write env variables
+      run: uv run tbx write-env -c GA_ID ${{ secrets.GA_ID }} --force-write
+
+    - name: Write requirements.txt file
+      run: uv run tbx write-req --force-write
+
     - name: Configure rsconnect-python
       run: uv run rsconnect add --account ${{ secrets.ACCOUNT }} --name ${{ secrets.NAME }} --token ${{ secrets.TOKEN }} --secret ${{ secrets.SECRET }}
 

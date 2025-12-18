@@ -7,7 +7,7 @@ from synthetmic.data.utils import create_constant_volumes
 from shared.utils import fit_data
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def _seeds() -> np.ndarray:
     return np.array(
         [

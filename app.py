@@ -1,8 +1,10 @@
+import os
 import pathlib
 from typing import Callable, Generator
 
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from shiny.types import FileInfo, ImgData
 from shiny_validate import InputValidator, check
@@ -10,6 +12,8 @@ from shiny_validate import InputValidator, check
 import shared.controls as ct
 from shared import styles, utils, views
 from tabs import genmic
+
+load_dotenv()
 
 APP_NAME: str = "SynthetMic-GUI"
 APP_VERSION: str = utils.get_app_version()
@@ -165,11 +169,27 @@ sidebar = ui.sidebar(
     id="sidebar",
 )
 
+page_dependencies = ui.head_content(
+    ui.HTML(
+        f"""
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id={os.getenv("GA_ID")}"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){{dataLayer.push(arguments);}}
+          gtag('js', new Date());
+          gtag('config', '{os.getenv("GA_ID")}');
+        </script>
+        """
+    ),
+    ui.tags.style(styles.popover_modal_navbar),
+)
+
 app_ui = ui.page_sidebar(
     sidebar,
     genmic.page_ui("genmic"),
+    page_dependencies,
     ui.head_content(ui.tags.link(rel="icon", type="image/png", href="favicon.ico")),
-    ui.head_content(ui.tags.style(styles.popover_modal_navbar)),
     title=APP_NAME,
     fillable=True,
     fillable_mobile=True,
