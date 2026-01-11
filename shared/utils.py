@@ -3,7 +3,6 @@ import itertools
 import json
 import pathlib
 import tempfile
-import tomllib
 import zipfile
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
@@ -101,9 +100,6 @@ def sample_single_phase_vols(
             samples = np.random.lognormal(mean=mu, sigma=sigma, size=n_grains)
             samples = samples**space_dim
 
-            # samples = np.random.lognormal(
-            #     mean=kwargs["mean"], sigma=kwargs["std"], size=n_grains
-            # )
             scaling_factor = domain_vol / samples.sum()
 
             return scaling_factor * samples
@@ -802,15 +798,18 @@ def validate_df(
     df_colnames = df.columns.to_list()
 
     if df_colnames != expected_colnames:
-        return f"Column mismatch error in the uploaded {file} file: expected {expected_colnames} but got {df_colnames}. Please try again."
+        return f"""Column mismatch error in the uploaded {file} file: expected
+        {expected_colnames} but got {df_colnames}. Please try again."""
 
     if expected_dim is not None:
         if df.shape != expected_dim:
-            return f"Dimension mismatch error in the uploaded {file} file: expected dimension {expected_dim} but got {df.shape}. Please try again."
+            return f"""Dimension mismatch error in the uploaded {file} file:
+            expected dimension {expected_dim} but got {df.shape}. Please try again."""
 
     df_dtypes = df.dtypes.values.tolist()
     if not all(t == expected_type for t in df_dtypes):
-        return f"Data type mismatch error in the uploaded {file} file: expected all values to be of {expected_type} but got {df_dtypes}. Please try again."
+        return f"""Data type mismatch error in the uploaded {file}
+        file: expected all values to be of {expected_type} but got {df_dtypes}. Please try again."""
 
     if bounds is not None:
         msg = []
@@ -899,7 +898,6 @@ def create_diagram_bytes(diagram: Diagram) -> bytes:
 
             buffer.close()
 
-        # write the vertices to json
         buffer = io.StringIO()
         json.dump(
             diagram.vertices,
@@ -947,15 +945,6 @@ def create_diagram_bytes(diagram: Diagram) -> bytes:
     zip_buffer.seek(0)
 
     return zip_buffer.getvalue()
-
-
-def get_app_version() -> str:
-    with open("./pyproject.toml", "rb") as f:
-        pyproject_data = tomllib.load(f)
-
-    version = pyproject_data["project"]["version"]
-
-    return f"v{version}"
 
 
 def compute_cut_interval(
@@ -1050,7 +1039,6 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
 
             buffer.close()
 
-        # write some metadata to json file
         buffer = io.StringIO()
         json.dump(
             {
@@ -1078,12 +1066,49 @@ def load_image(image_path: pathlib.Path) -> ImgData:
 
 
 def qp(mean: float, std: float, p: float = 0.9) -> float:
-    # Function to return the p-th percentile for the log normal distribution
-    # whose mean and standard deviation are mean and std
-    # scipy.stats.norm.ppf(p) gives $\Phi^{-1}(p)$
+    r"""Function to return the p-th percentile for the log normal distribution
+    whose mean and standard deviation are mean and std
+    scipy.stats.norm.ppf(p) gives $\Phi^{-1}(p)$."""
 
     return (
         mean**2
         * np.exp(norm.ppf(p) * np.sqrt(np.log(1 + std**2 / mean**2)))
         / np.sqrt(mean**2 + std**2)
     )
+
+
+def calculate_num_vertices(
+    grain_face_vertices: list, space_dim: int, precision: int
+) -> tuple[list[int], int]:
+    res = []
+
+    match space_dim:
+        case 2:
+            for v in grain_face_vertices:
+                res.append(len(v))
+
+            all_vertices = np.vstack(grain_face_vertices)
+            unique_vertices = np.unique(np.round(all_vertices, precision), axis=0)
+            total_vertices = len(unique_vertices)
+
+        case 3:
+            unique_vertex_list = []
+
+            for grain_faces in grain_face_vertices:
+                grain_vertices = np.array(
+                    [vertex for face in grain_faces for vertex in face]
+                )
+                unique_vertices = np.unique(np.round(grain_vertices, precision), axis=0)
+                unique_vertex_list.append(unique_vertices)
+                res.append(len(unique_vertices))
+
+            all_grain_vertices = np.vstack(unique_vertex_list)
+            unique_grain_vertices = np.unique(
+                np.round(all_grain_vertices, precision), axis=0
+            )
+            total_vertices = len(unique_grain_vertices)
+
+        case _:
+            raise ValueError(f"Invalid space_dim {space_dim}")
+
+    return res, total_vertices

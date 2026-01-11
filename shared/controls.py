@@ -1,5 +1,14 @@
+import tomllib
 from enum import StrEnum, auto
 from typing import Any
+
+with open("pyproject.toml", "rb") as f:
+    pyproject_data = tomllib.load(f)
+
+
+APP_VERSION: str = f"v{pyproject_data['project']['version']}"
+APP_NAME: str = "SynthetMic-GUI"
+FILL_COLOUR: str = "#0073CF"
 
 
 class ExampleDataName(StrEnum):
@@ -82,5 +91,3 @@ PLOT_DEFAULTS: dict[str, Any] = {
     "slice_normal": "x",
     "clip_normal": "x",
 }
-
-FILL_COLOUR: str = "#0073CF"

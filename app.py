@@ -15,9 +15,6 @@ from tabs import genmic
 
 load_dotenv()
 
-APP_NAME: str = "SynthetMic-GUI"
-APP_VERSION: str = utils.get_app_version()
-
 
 def phase_input(n: int) -> ui.Tag:
     return ui.row(
@@ -50,7 +47,7 @@ sidebar = ui.sidebar(
     ui.card(
         ui.card_header("Help center"),
         ui.markdown(
-            f"Need help? Read how to use {APP_NAME} by clicking the button below."
+            f"Need help? Read how to use {ct.APP_NAME} by clicking the button below."
         ),
         views.create_input_action_button(
             id="show_how_modal",
@@ -164,7 +161,7 @@ sidebar = ui.sidebar(
     ),
     ui.input_dark_mode(mode="light"),
     views.feedback_text(),
-    ui.help_text(f"{APP_NAME} {APP_VERSION}"),
+    ui.help_text(f"{ct.APP_NAME} {ct.APP_VERSION}"),
     width=560,
     id="sidebar",
 )
@@ -190,16 +187,13 @@ app_ui = ui.page_sidebar(
     genmic.page_ui("genmic"),
     page_dependencies,
     ui.head_content(ui.tags.link(rel="icon", type="image/png", href="favicon.ico")),
-    title=APP_NAME,
+    title=ct.APP_NAME,
     fillable=True,
     fillable_mobile=True,
 )
 
 
 def server(input: Inputs, output: Outputs, session: Session) -> None:
-    # ....................................................................
-    #  some validation rules to be reused
-    # ...................................................................
     def req_gt(rhs: float) -> Callable:
         return check.compose_rules(utils.required(), utils.gt(rhs=rhs))
 
@@ -253,9 +247,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             case _:
                 return {}
 
-    # ------------------------------------------------------------------------------
-    # some helper functions for parsing inputs
-    # ------------------------------------------------------------------------------
     def parse_box_dim() -> tuple[float, ...]:
         box_dim = (input.length(), input.breadth())
         if input.dim() == ct.Dimension.THREE_D:
@@ -269,10 +260,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             periodic += (input.is_z_periodic(),)
 
         return periodic
-
-    # ....................................................................
-    # reactive and side effect calculations
-    # ...................................................................
 
     # define reactive variables for holding uploaded seeds and volumes
     _uploaded_seeds = reactive.Value(value=None)
@@ -291,7 +278,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         if file is not None:
             _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))
 
-    views.info_modal(APP_NAME)
+    views.info_modal(ct.APP_NAME)
 
     @reactive.calc
     @reactive.event(input.generate)
@@ -498,10 +485,6 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             damp_param=float(input.damp_param()),
         )
 
-    # ....................................................................
-    # reactive and non-reactive uis
-    # ...................................................................
-
     @render.download(
         filename=lambda: f"synthetmic-gui-example-{input.example_data()}.zip",
         media_type="application/zip",
@@ -641,7 +624,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     @reactive.event(input.show_how_modal)
     def _() -> None:
         views.how_modal(
-            app_name=APP_NAME,
+            app_name=ct.APP_NAME,
             data_selection_id="example_data",
             data_extension_id="example_data_extension",
             data_card_id="example_data_card",
