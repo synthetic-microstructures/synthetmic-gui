@@ -300,6 +300,20 @@ def server(
 
     @render.ui
     def metrics_tab_card() -> ui.Tag | None:
+        if input.view() == ct.DiagramView.CLIP:
+            return ui.card(
+                ui.card_header(
+                    faicons.icon_svg("circle-exclamation", fill=ct.FILL_COLOUR),
+                    "A note on metrics",
+                ),
+                ui.markdown(
+                    """
+                    Metrics are not available for clip view. You can only view the clipped microstructure
+                    by selecting the **Microstructure** tab.
+                    """
+                ),
+            )
+
         metrics = _calculate_metrics()
         if isinstance(metrics, Exception):
             views.create_error_notification(str(metrics))
@@ -357,16 +371,24 @@ def server(
                 "Mean of ECDs",
                 "Standard deviation of ECDs",
                 "90th percentile of ECDs",
+                "Total number of unique vertices",
+                "Mean of the number of vertices per grain",
+                "Standard deviation of the number of vertices per grain",
+                "90th percentile of the number of vertices per grain",
             ],
             [
                 metrics.max_percentage_error,
                 metrics.mean_percentage_error,
                 metrics.fitted_volumes_mean,
                 metrics.fitted_volumes_std,
-                metrics.fitted_volumes_90_percentile,
+                metrics.fitted_volumes_90p,
                 metrics.ecds_mean,
                 metrics.ecds_std,
                 metrics.ecds_d90,
+                metrics.tot_num_uniq_verts,
+                metrics.num_verts_per_grain_mean,
+                metrics.num_verts_per_grain_std,
+                metrics.num_verts_per_grain_90p,
             ],
         ):
             if isinstance(v, float):
@@ -382,27 +404,14 @@ def server(
                     title=t,
                     value=v_formated,
                     full_screen=False,
-                    showcase=faicons.icon_svg("square-poll-horizontal"),
+                    showcase=faicons.icon_svg("chart-line"),
                 )
-            )
-
-        if input.view() == ct.DiagramView.CLIP:
-            return ui.card(
-                ui.card_header(
-                    faicons.icon_svg("circle-exclamation", fill=ct.FILL_COLOUR),
-                    "A note on metrics",
-                ),
-                ui.markdown(
-                    """
-                    Metrics are not available for clip view. You can only view the clipped microstructure
-                    by selecting the **Microstructure** tab.
-                    """
-                ),
             )
 
         return ui.tags.div(
             ui.row(ui.layout_column_wrap(*stats[:4])),
-            ui.row(ui.layout_column_wrap(*stats[4:])),
+            ui.row(ui.layout_column_wrap(*stats[4:8])),
+            ui.row(ui.layout_column_wrap(*stats[8:])),
             ui.card(
                 ui.output_plot("plot_metrics"),
                 download_popover,

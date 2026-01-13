@@ -53,12 +53,16 @@ class Metrics:
     space_dim: int
     fig: Figure
     plot_data: dict[str, dict[str, list]]
-    fitted_volumes_mean: np.ndarray
-    fitted_volumes_std: np.ndarray
-    fitted_volumes_90_percentile: np.ndarray
-    ecds_mean: np.ndarray
-    ecds_std: np.ndarray
-    ecds_d90: np.ndarray
+    fitted_volumes_mean: float
+    fitted_volumes_std: float
+    fitted_volumes_90p: float
+    ecds_mean: float
+    ecds_std: float
+    ecds_d90: float
+    tot_num_uniq_verts: int
+    num_verts_per_grain_mean: float
+    num_verts_per_grain_std: float
+    num_verts_per_grain_90p: float
     mean_percentage_error: float | None = None
     max_percentage_error: float | None = None
 
@@ -229,7 +233,8 @@ def generate_clip_diagram(
         return_clipped=True,
         crinkle=True,
         invert=not invert,  # note: invert is negated to have a more intuitive behaviour;
-        # so if clip_value is 0.1 and invert is false, the bits up to 0.1 will be stored as the first element in the returned tuple.
+        # so if clip_value is 0.1 and invert is false, the bits up to 0.1 will
+        # be stored as the first element in the returned tuple.
     )
 
     pl = pv.Plotter(
@@ -623,20 +628,6 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
     return property_dict
 
 
-def calculate_num_vertices_3d(
-    grain_face_vertices: dict[int, list], precision: int
-) -> list[int]:
-    res = []
-
-    for grain_faces in grain_face_vertices.values():
-        grain_vertices = np.array([vertex for face in grain_faces for vertex in face])
-        unique_vertices = np.unique(np.round(grain_vertices, precision), axis=0)
-
-        res.append(len(unique_vertices))
-
-    return res
-
-
 def check_space_dim(space_dim: int) -> None:
     if space_dim not in (2, 3):
         raise ValueError(
@@ -672,8 +663,6 @@ def get_domain_measure(
 
 
 def calculate_metrics(diagram: Diagram) -> Metrics:
-    fig = plt.figure()
-
     if diagram.target_volumes.size == 0:
         errors = np.array([])
         mean_percentage_error = None
@@ -692,13 +681,23 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
     PRECISION = 8
 
     space_dim = diagram.seeds.shape[1]
-    ftitle = get_domain_measure(space_dim=space_dim, title=True, plural=False)
+    check_space_dim(space_dim)
 
     non_zero_grain_ids = diagram.fitted_volumes.nonzero()[0]
     non_zero_grain_size = diagram.fitted_volumes[non_zero_grain_ids]
 
-    plot_data = {}
+    num_vertices_list, tot_num_uniq_verts = calculate_num_vertices(
+        grain_face_vertices=[
+            list(diagram.vertices.values())[i] for i in non_zero_grain_ids
+        ],
+        space_dim=space_dim,
+        precision=PRECISION,
+    )
 
+    plot_data = {}
+    fig = plt.figure()
+
+    ftitle = get_domain_measure(space_dim=space_dim, title=True, plural=False)
     keys = (
         f"{ftitle.lower()}_distribution",
         f"{ftitle.lower()}-weighted_{ftitle.lower()}_distribution",
@@ -733,21 +732,6 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
             ax.set_ylabel("Normalized frequency")
 
         else:
-            check_space_dim(space_dim)
-
-            num_vertices_list = []
-
-            if space_dim == 2:
-                for v in [
-                    list(diagram.vertices.values())[idx] for idx in non_zero_grain_ids
-                ]:
-                    num_vertices_list.append(len(v))
-
-            else:
-                num_vertices_list = calculate_num_vertices_3d(
-                    diagram.vertices, precision=PRECISION
-                )
-
             min_n, max_n = min(num_vertices_list), max(num_vertices_list)
             bins = np.linspace(
                 min_n - 0.5,
@@ -780,7 +764,11 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
         max_percentage_error=max_percentage_error,
         fitted_volumes_mean=non_zero_grain_size.mean(),
         fitted_volumes_std=non_zero_grain_size.std(),
-        fitted_volumes_90_percentile=np.percentile(non_zero_grain_size, q=90),
+        fitted_volumes_90p=np.percentile(non_zero_grain_size, q=90),
+        tot_num_uniq_verts=tot_num_uniq_verts,
+        num_verts_per_grain_mean=np.mean(num_vertices_list),
+        num_verts_per_grain_std=np.std(num_vertices_list),
+        num_verts_per_grain_90p=np.percentile(num_vertices_list, q=90),
         ecds_mean=ecds.mean(),
         ecds_std=ecds.std(),
         ecds_d90=np.percentile(ecds, q=90),
@@ -1089,7 +1077,7 @@ def calculate_num_vertices(
 
             all_vertices = np.vstack(grain_face_vertices)
             unique_vertices = np.unique(np.round(all_vertices, precision), axis=0)
-            total_vertices = len(unique_vertices)
+            tot_num_uniq_verts = len(unique_vertices)
 
         case 3:
             unique_vertex_list = []
@@ -1106,9 +1094,9 @@ def calculate_num_vertices(
             unique_grain_vertices = np.unique(
                 np.round(all_grain_vertices, precision), axis=0
             )
-            total_vertices = len(unique_grain_vertices)
+            tot_num_uniq_verts = len(unique_grain_vertices)
 
         case _:
             raise ValueError(f"Invalid space_dim {space_dim}")
 
-    return res, total_vertices
+    return res, tot_num_uniq_verts
