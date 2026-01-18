@@ -59,10 +59,6 @@ class Metrics:
     ecds_mean: float
     ecds_std: float
     ecds_d90: float
-    tot_num_uniq_verts: int
-    num_verts_per_grain_mean: float
-    num_verts_per_grain_std: float
-    num_verts_per_grain_90p: float
     mean_percentage_error: float | None = None
     max_percentage_error: float | None = None
 
@@ -718,6 +714,7 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
             )
             ax.set_xlabel(f"{ftitle}s" if i == 0 else f"{ftitle} errors (%)")
             ax.set_ylabel("Frequency")
+            ax.set_title(k.replace("_", " ").capitalize())
 
         elif i == 1:
             out_values, out_bins, _ = ax.hist(
@@ -730,6 +727,7 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
             )
             ax.set_xlabel(f"{ftitle}s")
             ax.set_ylabel("Normalized frequency")
+            ax.set_title(k.replace("_", " ").capitalize())
 
         else:
             min_n, max_n = min(num_vertices_list), max(num_vertices_list)
@@ -749,8 +747,10 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
             ax.set_xlabel("Number of vertices")
             ax.set_ylabel("Frequency")
             ax.xaxis.set_major_locator(tck.MaxNLocator(integer=True))
+            ax.set_title(
+                f"{k.replace('_', ' ').capitalize()}\nTotal number of unique vertices: {tot_num_uniq_verts}"
+            )
 
-        ax.set_title(k.replace("_", " ").capitalize())
         ax.spines[["top", "right"]].set_visible(False)
 
         plot_data[k] = {"bins": out_bins.tolist(), "bin_values": out_values.tolist()}
@@ -765,10 +765,6 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
         fitted_volumes_mean=non_zero_grain_size.mean(),
         fitted_volumes_std=non_zero_grain_size.std(),
         fitted_volumes_90p=np.percentile(non_zero_grain_size, q=90),
-        tot_num_uniq_verts=tot_num_uniq_verts,
-        num_verts_per_grain_mean=np.mean(num_vertices_list),
-        num_verts_per_grain_std=np.std(num_vertices_list),
-        num_verts_per_grain_90p=np.percentile(num_vertices_list, q=90),
         ecds_mean=ecds.mean(),
         ecds_std=ecds.std(),
         ecds_d90=np.percentile(ecds, q=90),

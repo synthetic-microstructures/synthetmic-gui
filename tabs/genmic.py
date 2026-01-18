@@ -371,10 +371,6 @@ def server(
                 "Mean of ECDs",
                 "Standard deviation of ECDs",
                 "90th percentile of ECDs",
-                "Total number of unique vertices",
-                "Mean of the number of vertices per grain",
-                "Standard deviation of the number of vertices per grain",
-                "90th percentile of the number of vertices per grain",
             ],
             [
                 metrics.max_percentage_error,
@@ -385,10 +381,6 @@ def server(
                 metrics.ecds_mean,
                 metrics.ecds_std,
                 metrics.ecds_d90,
-                metrics.tot_num_uniq_verts,
-                metrics.num_verts_per_grain_mean,
-                metrics.num_verts_per_grain_std,
-                metrics.num_verts_per_grain_90p,
             ],
         ):
             if isinstance(v, float):
@@ -410,8 +402,7 @@ def server(
 
         return ui.tags.div(
             ui.row(ui.layout_column_wrap(*stats[:4])),
-            ui.row(ui.layout_column_wrap(*stats[4:8])),
-            ui.row(ui.layout_column_wrap(*stats[8:])),
+            ui.row(ui.layout_column_wrap(*stats[4:])),
             ui.card(
                 ui.output_plot("plot_metrics"),
                 download_popover,
