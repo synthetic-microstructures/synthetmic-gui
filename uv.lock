@@ -2273,7 +2273,7 @@ provides-extras = ["tests", "deploy"]
 [[package]]
 name = "tbx"
 version = "0.1.0"
-source = { git = "https://github.com/Rasheed19/tbx.git#4116a8f06664c0a4082128e69c2dec574e494572" }
+source = { git = "https://github.com/Rasheed19/tbx.git#055099b4a9b1f0adbd50f891bcf73b2189c86e0d" }
 dependencies = [
     { name = "click" },
     { name = "pyfiglet" },
