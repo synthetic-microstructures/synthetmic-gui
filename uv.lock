@@ -1708,7 +1708,7 @@ wheels = [
 
 [[package]]
 name = "pyvista"
-version = "0.46.3"
+version = "0.46.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
@@ -1719,9 +1719,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "vtk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fe/2d/20d948877f0f1e4f56b8646c06dc723ef799ad5690bc6a0c9bbc12b32981/pyvista-0.46.3.tar.gz", hash = "sha256:1f8e6e39516d24d93bc227f278841a0d72ec3722959f612cf4616d2720a8afe1", size = 2397947, upload-time = "2025-08-26T14:00:32.315Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1b/bd/a4e4131b2d4b908a060b43f8346ce863d76a6fecf8a1c2c845602e96c610/pyvista-0.46.5.tar.gz", hash = "sha256:b637bfa32136b95e5e5a6d972871606a68e3c625fc652ff5d9f00390294e99c0", size = 2397682, upload-time = "2026-01-15T00:29:12.727Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a5/e7/bf672c00690a8eb47d4bb9ab0f5c9368d23eb1ae373984a6eec323c6f317/pyvista-0.46.3-py3-none-any.whl", hash = "sha256:ccb2a09019cad7976cfeeeb4f00fec2087127499ded795bada9a6a39d4bff30e", size = 2448488, upload-time = "2025-08-26T14:00:30.637Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/df/39a108f198dd2240f2c9dad06c7c81d44809aeb83f3eb2c9d5a1ae9e4311/pyvista-0.46.5-py3-none-any.whl", hash = "sha256:d254e1e32e1df0dc04b409f989bd56b24d9e94086d868597af6c501151ec17fa", size = 2448206, upload-time = "2026-01-15T00:29:10.035Z" },
 ]
 
 [package.optional-dependencies]
@@ -2266,12 +2266,14 @@ dependencies = [
     { name = "numpy" },
     { name = "pysdot" },
     { name = "python-dotenv" },
+    { name = "pyvista" },
     { name = "rsconnect-python" },
     { name = "seaborn" },
     { name = "shiny" },
     { name = "shiny-validate" },
     { name = "shinywidgets" },
     { name = "synthetmic" },
+    { name = "trame-vtk" },
 ]
 
 [package.optional-dependencies]
@@ -2289,6 +2291,7 @@ requires-dist = [
     { name = "pysdot", specifier = "==0.2.38" },
     { name = "pytest", marker = "extra == 'tests'", specifier = ">=9.0.1" },
     { name = "python-dotenv", specifier = "==1.2.1" },
+    { name = "pyvista", specifier = "==0.46.5" },
     { name = "rsconnect-python", specifier = "==1.27.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shiny", specifier = "==1.5.1" },
@@ -2296,6 +2299,7 @@ requires-dist = [
     { name = "shinywidgets", specifier = ">=0.6.2" },
     { name = "synthetmic", specifier = "==0.1.5" },
     { name = "tbx", marker = "extra == 'deploy'", git = "https://github.com/Rasheed19/tbx.git" },
+    { name = "trame-vtk", specifier = "==2.9.1" },
 ]
 provides-extras = ["tests", "deploy"]
 
