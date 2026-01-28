@@ -108,15 +108,6 @@ wheels = [
 ]
 
 [[package]]
-name = "appdirs"
-version = "1.4.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d7/d8/05696357e0311f5b5c316d7b95f46c669dd9c15aaeecbb48c7d0aeb88c40/appdirs-1.4.4.tar.gz", hash = "sha256:7d5d0167b2b1ba821647616af46a749d1c653740dd0d2415100fe26e27afdf41", size = 13470, upload-time = "2020-05-11T07:59:51.037Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/00/2344469e2084fb287c2e0b57b72910309874c3245463acd6cf5e3db69324/appdirs-1.4.4-py2.py3-none-any.whl", hash = "sha256:a841dacd6b99318a741b166adb07e19ee71a274450e68237b4650ca1055ab128", size = 9566, upload-time = "2020-05-11T07:59:49.499Z" },
-]
-
-[[package]]
 name = "argon2-cffi"
 version = "25.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2116,10 +2107,9 @@ wheels = [
 
 [[package]]
 name = "shiny"
-version = "1.4.0"
+version = "1.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "appdirs" },
     { name = "asgiref" },
     { name = "click", marker = "sys_platform != 'emscripten'" },
     { name = "htmltools" },
@@ -2129,19 +2119,21 @@ dependencies = [
     { name = "narwhals" },
     { name = "orjson" },
     { name = "packaging" },
+    { name = "platformdirs" },
     { name = "prompt-toolkit", marker = "sys_platform != 'emscripten'" },
     { name = "python-multipart", marker = "sys_platform != 'emscripten'" },
     { name = "questionary", marker = "sys_platform != 'emscripten'" },
     { name = "setuptools" },
+    { name = "shinychat" },
     { name = "starlette" },
     { name = "typing-extensions" },
     { name = "uvicorn", marker = "sys_platform != 'emscripten'" },
     { name = "watchfiles", marker = "sys_platform != 'emscripten'" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/dc/1f1da052f0af709ee73dc07ef12f4c5395eff861e430143ae115fabdc3bb/shiny-1.4.0.tar.gz", hash = "sha256:05c709c2a074b9e9f5a82065460815ff40bc686286bacfcab5195a69f3ae759b", size = 4837146, upload-time = "2025-04-08T16:49:45.406Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/72/8c/570fb0c8aa3b3f2b30e2f401bbe4048e7c39fb5ffb70994520fdff32a8da/shiny-1.5.1.tar.gz", hash = "sha256:482fa54635a6dc7e914cdbaa9099fe445790af3053d849b4e9a81e0f61677d37", size = 4941243, upload-time = "2025-12-08T18:18:23.763Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f5/e8/ae54ce930d965211c77b28a8c3792f78a80ad1bd012bbb05000176dd246c/shiny-1.4.0-py3-none-any.whl", hash = "sha256:c7748d0cd32696477613b9c00664320ea1604b9d9770a2ec2e8ea7ea5e0b44b4", size = 3870396, upload-time = "2025-04-08T16:49:43.516Z" },
+    { url = "https://files.pythonhosted.org/packages/09/2d/c955cbc6e66aff92645a7af35fa017001dffecb849b764f609fdc68da088/shiny-1.5.1-py3-none-any.whl", hash = "sha256:5ed60168e94fce0b7fc65bc04b92398e2611a2410acbcb850f8ae3001b99de40", size = 3943136, upload-time = "2025-12-08T18:18:21.654Z" },
 ]
 
 [[package]]
@@ -2154,6 +2146,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3a/5f/499b52ae5f5ccde146a2718feea2fc11ef3411ecaed58f5cdec1c6cd49f4/shiny_validate-0.1.3.tar.gz", hash = "sha256:db3f530e0af99c792fb8fe1b3feb760658ce88ea5a35fbb88b8a23c2403291e8", size = 34814, upload-time = "2025-03-17T14:24:42.944Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/59/0d/e022d169e127413cbdb9cfe0b1a8e45a77ba78adc6ea5a3a4c820cdc0b64/shiny_validate-0.1.3-py3-none-any.whl", hash = "sha256:c66842f9b5e9deab8ba87eb6437cb14bbe470c603550d7055acfd3ec1f5d0f70", size = 40178, upload-time = "2025-03-17T14:24:41.711Z" },
+]
+
+[[package]]
+name = "shinychat"
+version = "0.2.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "htmltools" },
+    { name = "shiny" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a3/c6/6887a3618842e65794e5dcfb345825ccd43d58c56fefa9d31286d8e14d16/shinychat-0.2.8.tar.gz", hash = "sha256:d27f28ddf1d512a05ef2cc2f0cffbb75b5b6e3157d5e3690ce4e63d18bfa7492", size = 547318, upload-time = "2025-09-11T20:13:20.367Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/16/01/8658eaffa920f4c621f05acc42ea98248147706079287b3a7ab4e47e1ece/shinychat-0.2.8-py3-none-any.whl", hash = "sha256:6742a2354257280458269a8b5675f1254e5583be34b6eb1a626de44c0323286a", size = 561057, upload-time = "2025-09-11T20:13:18.683Z" },
 ]
 
 [[package]]
@@ -2286,7 +2291,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = "==1.2.1" },
     { name = "rsconnect-python", specifier = "==1.27.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "shiny", specifier = ">=1.4.0" },
+    { name = "shiny", specifier = "==1.5.1" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
     { name = "shinywidgets", specifier = ">=0.6.2" },
     { name = "synthetmic", specifier = "==0.1.5" },

@@ -6,6 +6,6 @@ numpy==2.3.2
 python-dotenv==1.2.1
 rsconnect-python==1.27.0
 seaborn>=0.13.2
-shiny>=1.4.0
+shiny==1.5.1
 shiny-validate>=0.1.3
 shinywidgets>=0.6.2
