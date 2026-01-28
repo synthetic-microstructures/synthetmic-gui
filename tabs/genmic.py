@@ -1,3 +1,4 @@
+import tempfile
 from datetime import datetime
 
 import faicons
@@ -420,7 +421,12 @@ def server(
 
         @render.ui
         def display_diagram():
-            return ui.HTML(diagram.plotter.export_html(filename=None).read())
+            with tempfile.NamedTemporaryFile(suffix=".html", delete=True) as f:
+                diagram.plotter.export_html(f.name)
+                f.seek(0)
+                html = f.read().decode("utf-8")
+
+            return ui.HTML(html)
 
         @render.download(
             filename=lambda: f"synthetmic-gui-output-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
