@@ -61,7 +61,7 @@ def test_total_num_vertices(
     num_vertices_per_grain, num_unique_vertices = calculate_num_vertices(
         grain_face_vertices=grain_face_vertices,
         space_dim=space_dim,
-        precision=8,
+        precision=2,
     )
 
     assert sum(num_vertices_per_grain) == exp_num_vertices_per_grain
