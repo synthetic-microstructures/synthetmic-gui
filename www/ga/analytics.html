@@ -1,0 +1,73 @@
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-VZY1SHBD8M"></script>
+
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-VZY1SHBD8M');
+</script>
+
+<script>
+    // for custom events
+    Shiny.addCustomMessageHandler("ga_event", function (msg) {
+        gtag("event", msg.name, {
+            event_category: msg.category,
+            event_label: msg.label,
+            transport_type: "beacon"
+        });
+    });
+</script>
+
+<script>
+    // For download buttons
+    $(document).on('click', '#laguerre-common-download_diagram', function () {
+        gtag(
+            'event',
+            'laguerre_diagram_download',
+            {
+                event_category: "button",
+                event_label: "download laguerre diagram",
+                transport_type: "beacon"
+            }
+        );
+    });
+
+    $(document).on('click', '#laguerre-common-download_metrics', function () {
+        gtag(
+            'event',
+            'laguerre_metrics_download',
+            {
+                event_category: "button",
+                event_label: "download laguerre metrics",
+                transport_type: "beacon"
+            }
+        );
+    });
+
+
+    $(document).on('click', '#voronoi-common-download_diagram', function () {
+        gtag(
+            'event',
+            'voronoi_diagram_download',
+            {
+                event_category: "button",
+                event_label: "download voronoi diagram",
+                transport_type: "beacon"
+            }
+        );
+    });
+
+    $(document).on('click', '#voronoi-common-download_metrics', function () {
+        gtag(
+            'event',
+            'voronoi_metrics_download',
+            {
+                event_category: "button",
+                event_label: "download voronoi metrics",
+                transport_type: "beacon"
+            }
+        );
+    });
+
+</script>
