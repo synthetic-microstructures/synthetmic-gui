@@ -7,6 +7,7 @@ from shared import comps
 from shared.consts import (
     APP_NAME,
     APP_VERSION,
+    DiagramType,
     Dimension,
     Distribution,
     ExampleDataName,
@@ -356,14 +357,20 @@ def create_dist_param(
             )
 
 
-def info_modal() -> None:
+def info_modal(diagram_id: str) -> None:
     ui.modal_show(
         ui.modal(
             ui.markdown(f"### {APP_NAME}"),
             ui.hr(),
             about_text(APP_NAME),
+            comps.create_selection(
+                id=diagram_id,
+                label="Choose a type of microstructure",
+                choices=[d for d in DiagramType],
+                selected=DiagramType.LAGUERRE,
+            ),
             size="m",
-            easy_close=True,
+            easy_close=False,
             footer=ui.modal_button(
                 "Close",
                 class_="btn btn-primary",

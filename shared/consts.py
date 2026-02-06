@@ -11,6 +11,11 @@ APP_NAME: str = "SynthetMic-GUI"
 FILL_COLOUR: str = "#0073CF"
 
 
+class DiagramType(StrEnum):
+    LAGUERRE = auto()
+    VORONOI = auto()
+
+
 class ExampleDataName(StrEnum):
     BASIC = auto()
     RANDOM = auto()
