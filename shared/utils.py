@@ -1156,3 +1156,13 @@ def calculate_num_vertices(
             raise ValueError(f"Invalid space_dim {space_dim}")
 
     return res, tot_num_uniq_verts
+
+
+def check_has_attribute(obj: object, attributes: list[str]) -> None:
+    for attr in attributes:
+        if not hasattr(obj, attr):
+            raise AttributeError(
+                f"""This {obj.__class__.__name__} instance does not have {attr} yet.
+                Call the appropriate method with appropriate arguments before using this instance.
+                """
+            )

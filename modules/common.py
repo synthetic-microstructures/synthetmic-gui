@@ -13,7 +13,7 @@ from shared.consts import FILL_COLOUR, PLOT_DEFAULTS, Colorby, DiagramView, Tab
 
 
 @module.ui
-def page_ui() -> ui.Tag:
+def ui_() -> ui.Tag:
     return ui.tags.div(
         ui.output_ui("tab_radio_buttons"),
         ui.row(
@@ -416,33 +416,29 @@ def server(
         )
 
     @render.ui
-    def display_diagram():
-        diagram = _calculate_diagram()
-
-        with tempfile.NamedTemporaryFile(suffix=".html", delete=True) as f:
-            diagram.plotter.export_html(f.name)
-            f.seek(0)
-            html = f.read().decode("utf-8")
-
-        soup = BeautifulSoup(html, "html.parser")
-        html = str(soup.body)
-        return ui.HTML(html)
-
-    @render.download(
-        filename=lambda: f"synthetmic-gui-output-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
-        media_type="application/zip",
-    )
-    def download_diagram():
-        diagram = _calculate_diagram()
-
-        yield utils.create_diagram_bytes(diagram)
-
-    @render.ui
     def diagram_tab_card() -> ui.Tag | None:
         diagram = _calculate_diagram()
         if isinstance(diagram, Exception):
             comps.create_error_notification(str(diagram))
             return
+
+        @render.ui
+        def display_diagram():
+            with tempfile.NamedTemporaryFile(suffix=".html", delete=True) as f:
+                diagram.plotter.export_html(f.name)
+                f.seek(0)
+                html = f.read().decode("utf-8")
+
+            soup = BeautifulSoup(html, "html.parser")
+            html = str(soup.body)
+            return ui.HTML(html)
+
+        @render.download(
+            filename=lambda: f"synthetmic-gui-output-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
+            media_type="application/zip",
+        )
+        def download_diagram():
+            yield utils.create_diagram_bytes(diagram)
 
         download_popover = ui.popover(
             ui.span(

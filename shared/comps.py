@@ -74,7 +74,6 @@ def create_page_sidebar(*args, sidebar: ui.Sidebar, **props) -> ui.Tag:
     return ui.page_sidebar(
         sidebar,
         *args,
-        title=None,
         fillable=True,
         fillable_mobile=True,
         **props,

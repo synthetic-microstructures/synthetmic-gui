@@ -21,53 +21,27 @@
 
 <script>
     // For download buttons
-    $(document).on('click', '#laguerre-common-download_diagram', function () {
+    $(document).on('click', '#common-download_diagram', function () {
         gtag(
             'event',
-            'laguerre_diagram_download',
+            'diagram_download',
             {
                 event_category: "button",
-                event_label: "download laguerre diagram",
+                event_label: "download diagram",
                 transport_type: "beacon"
             }
         );
     });
 
-    $(document).on('click', '#laguerre-common-download_metrics', function () {
+    $(document).on('click', '#common-download_metrics', function () {
         gtag(
             'event',
-            'laguerre_metrics_download',
+            'metrics_download',
             {
                 event_category: "button",
-                event_label: "download laguerre metrics",
+                event_label: "download metrics",
                 transport_type: "beacon"
             }
         );
     });
-
-
-    $(document).on('click', '#voronoi-common-download_diagram', function () {
-        gtag(
-            'event',
-            'voronoi_diagram_download',
-            {
-                event_category: "button",
-                event_label: "download voronoi diagram",
-                transport_type: "beacon"
-            }
-        );
-    });
-
-    $(document).on('click', '#voronoi-common-download_metrics', function () {
-        gtag(
-            'event',
-            'voronoi_metrics_download',
-            {
-                event_category: "button",
-                event_label: "download voronoi metrics",
-                transport_type: "beacon"
-            }
-        );
-    });
-
 </script>
