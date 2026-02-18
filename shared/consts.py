@@ -12,8 +12,8 @@ FILL_COLOUR: str = "#0073CF"
 
 
 class DiagramType(StrEnum):
-    LAGUERRE = auto()
-    VORONOI = auto()
+    LAGUERRE = "Laguerre"
+    VORONOI = "Voronoi"
 
 
 class ExampleDataName(StrEnum):

@@ -2242,7 +2242,7 @@ wheels = [
 
 [[package]]
 name = "synthetmic"
-version = "0.1.5"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
@@ -2252,14 +2252,14 @@ dependencies = [
     { name = "scipy" },
     { name = "vtk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/e1/d8a8ddc3334bafb39316f35438febea035f60ab2a1690f9bca0af2334448/synthetmic-0.1.5.tar.gz", hash = "sha256:66be3d6ebe050aa7eca075abb98527821240caa5164868e4ce0d924851080315", size = 134212, upload-time = "2025-11-29T22:49:04.877Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9b/15/f8290c9cef290c30b042a1ba84a20d272512042938573ccb53367bd2c121/synthetmic-0.2.0.tar.gz", hash = "sha256:5f15c45162c5f4c1f37684c014fae0bcc0224a0c249fa8e7a2c331f93b110b62", size = 134946, upload-time = "2026-02-18T18:10:31.098Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/27/e1c685e3254a830442af46e9009c5b75f47ede7e827e0ec9d7eb4da8449e/synthetmic-0.1.5-py3-none-any.whl", hash = "sha256:ccae949ef630a035975ce48c75d227fb93120b362883aeb97c77f5097aabfcbc", size = 18114, upload-time = "2025-11-29T22:49:03.703Z" },
+    { url = "https://files.pythonhosted.org/packages/28/10/fa2caacae1f887594488a70881941cfc72fa34d2b1e6c10ba1808082c273/synthetmic-0.2.0-py3-none-any.whl", hash = "sha256:61811b9d41141ac587fef0c8e984c2a425c6448358cff15ceda0709c49911cd2", size = 18931, upload-time = "2026-02-18T18:10:30.154Z" },
 ]
 
 [[package]]
 name = "synthetmic-gui"
-version = "0.3.3"
+version = "0.3.4"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -2299,7 +2299,7 @@ requires-dist = [
     { name = "shiny", specifier = "==1.5.1" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
     { name = "shinywidgets", specifier = ">=0.6.2" },
-    { name = "synthetmic", specifier = "==0.1.5" },
+    { name = "synthetmic", specifier = "==0.2.0" },
     { name = "tbx", marker = "extra == 'deploy'", git = "https://github.com/Rasheed19/tbx.git" },
     { name = "trame-vtk", specifier = "==2.9.1" },
 ]

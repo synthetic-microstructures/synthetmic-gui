@@ -33,7 +33,7 @@ sidebar = comps.create_sidebar(
         comps.group_ui_elements(
             comps.create_selection(
                 id="diagram",
-                label="Choose a diamgram type",
+                label="Choose a diagram type",
                 choices=[d for d in DiagramType],
                 selected=DiagramType.LAGUERRE,
             ),
