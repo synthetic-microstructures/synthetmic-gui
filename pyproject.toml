@@ -9,7 +9,6 @@ dependencies = [
     "synthetmic==0.2.0",
     "faicons>=0.2.2",
     "numpy==2.3.2",
-    "python-dotenv==1.2.1",
     "rsconnect-python==1.27.0",
     "seaborn>=0.13.2",
     "shiny==1.5.1",
