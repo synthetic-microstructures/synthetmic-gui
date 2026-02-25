@@ -204,11 +204,12 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             )
 
         else:
-            if _uploaded_seeds() is None:
+            seeds = _uploaded_seeds()
+            if seeds is None:
                 return Exception("Seeds not uploaded. Upload seeds and try again.")
 
             val_out = utils.validate_df(
-                _uploaded_seeds(),
+                seeds,
                 expected_colnames=list(utils.COORDINATES)[:space_dim],
                 expected_dim=(n_grains, space_dim),
                 expected_type="float",
@@ -218,7 +219,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             if isinstance(val_out, str):
                 return Exception(val_out)
 
-            seeds = _uploaded_seeds()
+            seeds = seeds.values
 
         # In case of Laguerre, check if len of volumes and seeds match
         if input.diagram() == DiagramType.LAGUERRE:
