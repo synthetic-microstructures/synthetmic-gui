@@ -1,10 +1,9 @@
 import io
-import itertools
 import json
 import pathlib
 import tempfile
 import zipfile
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any, Callable
 
 import matplotlib.pyplot as plt
@@ -13,16 +12,20 @@ import numpy as np
 import pandas as pd
 import pyvista as pv
 from matplotlib.figure import Figure
-from pysdot import ConvexPolyhedraAssembly, PowerDiagram
+from pysdot import PowerDiagram
 from scipy.stats import norm
 from shiny.types import ImgData
-from synthetmic import LaguerreDiagramGenerator
+from shiny_validate import check
+from synthetmic import LaguerreDiagramGenerator, VoronoiDiagramGenerator
 from synthetmic.data import paper
 from synthetmic.data.utils import SynthetMicData
+from synthetmic.generate import DiagramGenerator
+from synthetmic.utils import add_replicants, build_domain
 
-from shared.controls import (
+from shared.consts import (
     FILL_COLOUR,
     Colorby,
+    Dimension,
     Distribution,
     ExampleDataName,
     FigureExtension,
@@ -38,7 +41,7 @@ class Diagram:
     centroids: np.ndarray
     vertices: dict[int, list]
     fitted_volumes: np.ndarray
-    target_volumes: np.ndarray
+    target_volumes: np.ndarray | None
     weights: np.ndarray
     seeds: np.ndarray
     positions: np.ndarray
@@ -61,6 +64,43 @@ class Metrics:
     ecds_d90: float
     mean_percentage_error: float | None = None
     max_percentage_error: float | None = None
+
+
+@dataclass(frozen=True)
+class Event:
+    name: str
+    category: str
+    label: str
+
+
+@dataclass(frozen=True)
+class Box:
+    length: float
+    breadth: float
+    height: float | None
+
+
+@dataclass(frozen=True)
+class Periodic:
+    is_x_periodic: bool
+    is_y_periodic: bool
+    is_z_periodic: bool | None
+
+
+def parse_box_dim(box: Box, dim: str) -> tuple[float, ...]:
+    box_dim = (box.length, box.breadth)
+    if dim == Dimension.THREE_D:
+        box_dim += (box.height,)
+
+    return box_dim
+
+
+def parse_periodicity(p: Periodic, dim: str) -> tuple[bool, ...]:
+    periodic = (p.is_x_periodic, p.is_y_periodic)
+    if dim == Dimension.THREE_D:
+        periodic += (p.is_z_periodic,)
+
+    return periodic
 
 
 def sample_single_phase_vols(
@@ -140,48 +180,33 @@ def sample_dual_phase_vols(
     )
 
 
-def sample_seeds(
-    n_grains: int, random_state: int | None, *args
-) -> tuple[np.ndarray, np.ndarray]:
-    np.random.seed(random_state)
-
-    domain = np.array([[0, s] for s in args])
-
-    seeds = np.column_stack(
-        [np.random.uniform(low=0, high=h, size=n_grains) for h in args]
-    )
-
-    return domain, seeds
-
-
 def prepare_mesh(
     mesh: pv.PolyData | pv.UnstructuredGrid,
-    target_volumes: np.ndarray,
+    target_volumes: np.ndarray | None,
     fitted_volumes: np.ndarray,
     colorby: str,
 ) -> tuple[pv.PolyData | pv.UnstructuredGrid, tuple[float, float]]:
-    match colorby:
-        case Colorby.TARGET_VOLUMES:
-            colorby_values = target_volumes
+    if colorby not in Colorby:
+        raise ValueError(
+            f"Invalid colorby: {colorby}. Value must be one of {', '.join(Colorby)}"
+        )
 
-        case Colorby.FITTED_VOLUMES:
-            colorby_values = fitted_volumes
+    # In case target_volumes is none, use fitted_volumes
+    if target_volumes is None:
+        errors = fitted_volumes
+        target_volumes = fitted_volumes
 
-        case Colorby.VOLUME_ERRORS:
-            colorby_values = (
-                np.abs(fitted_volumes - target_volumes) * 100 / target_volumes
-            )
+    else:
+        errors = np.abs(fitted_volumes - target_volumes) * 100 / target_volumes
 
-        case Colorby.RANDOM:
-            np.random.seed(42)  # for reproducibility in a given app session
-            colorby_values = np.random.rand(target_volumes.shape[0])
+    register = {
+        Colorby.TARGET_VOLUMES: target_volumes,
+        Colorby.FITTED_VOLUMES: fitted_volumes,
+        Colorby.VOLUME_ERRORS: errors,
+        Colorby.RANDOM: np.random.rand(fitted_volumes.shape[0]),
+    }
 
-        case _:
-            raise ValueError(
-                f"Invalid colorby: {colorby}. Value must be one of {', '.join(Colorby)}"
-            )
-
-    mesh.cell_data["vols"] = colorby_values[mesh.cell_data["num"].astype(int)]
+    mesh.cell_data["vols"] = register[colorby][mesh.cell_data["num"].astype(int)]
     clim = min(mesh.cell_data["vols"]), max(mesh.cell_data["vols"])
 
     return mesh, clim
@@ -189,7 +214,7 @@ def prepare_mesh(
 
 def generate_clip_diagram(
     data: SynthetMicData,
-    generator: LaguerreDiagramGenerator,
+    generator: DiagramGenerator,
     colorby: str,
     clip_normal: str,
     clip_value: float,
@@ -282,7 +307,7 @@ def generate_clip_diagram(
 
 def generate_full_diagram(
     data: SynthetMicData,
-    generator: LaguerreDiagramGenerator,
+    generator: DiagramGenerator,
     colorby: str,
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
@@ -348,7 +373,7 @@ def generate_full_diagram(
 
 def generate_slice_diagram(
     data: SynthetMicData,
-    generator: LaguerreDiagramGenerator,
+    generator: DiagramGenerator,
     slice_normal: str,
     slice_value: float,
     colorby: str,
@@ -408,35 +433,16 @@ def generate_slice_diagram(
     seeds_map = dict(zip(COORDINATES, generator.get_positions().T))
     seeds = _map_normal_to_seeds(slice_normal, seeds_map)
 
-    omega = ConvexPolyhedraAssembly()
-    mins = domain[:, 0].copy()
-    maxs = domain[:, 1].copy()
-    lens = domain[:, 1] - domain[:, 0]
-    if periodic is not None:
-        for k, p in enumerate(periodic):
-            if p:
-                mins[k] = mins[k] - lens[k]
-                maxs[k] = maxs[k] + lens[k]
+    omega, lens = build_domain(domain=domain, periodic=periodic)
 
-    omega.add_box(mins, maxs)
     weights = generator.get_weights() - (slice_value - seeds_map[slice_normal]) ** 2
-
     pd = PowerDiagram(
         positions=seeds,
         weights=weights,
         domain=omega,
     )
-
-    # If there is periodicity, then add the replicants
     if periodic is not None:
-        periodic_dict = {True: [-1, 0, 1], False: [0]}
-        periodic_list = [periodic_dict[p] for p in periodic]
-
-        cartesian_periodic = list(itertools.product(*periodic_list))
-
-        for rep in cartesian_periodic:
-            if rep != (0,) * seeds.shape[1]:
-                pd.add_replication(rep * lens)
+        add_replicants(obj=pd, periodic=periodic, domain_lens=lens)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".vtk", delete=True) as tmp_file:
         filename = tmp_file.name
@@ -444,7 +450,7 @@ def generate_slice_diagram(
         pd.display_vtk(filename)
         mesh = pv.read(filename)
 
-    # note: base target and fitted volumes are used
+    # Note: base target and fitted volumes are used
     mesh, clim = prepare_mesh(
         mesh=mesh,
         target_volumes=data.volumes,
@@ -477,7 +483,7 @@ def generate_slice_diagram(
     return Diagram(
         centroids=pd.centroids(),
         vertices=vertices,
-        target_volumes=np.array([]),  # no target volumes for slice
+        target_volumes=None,
         fitted_volumes=pd.integrals(),
         weights=weights,
         domain=domain,
@@ -488,18 +494,33 @@ def generate_slice_diagram(
     )
 
 
-def fit_data(
+def fit(
     domain: np.ndarray,
     seeds: np.ndarray,
-    volumes: np.ndarray,
+    volumes: np.ndarray | None,
     periodic: list[bool],
-    tol: float,
+    tol: float | None,
     n_iter: int,
     damp_param: float,
-) -> tuple[SynthetMicData, LaguerreDiagramGenerator]:
-    generator = LaguerreDiagramGenerator(
-        tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=False
-    )
+) -> tuple[SynthetMicData, DiagramGenerator]:
+    if volumes is None:
+        generator = VoronoiDiagramGenerator(
+            n_iter=n_iter, damp_param=damp_param, verbose=False
+        )
+        generator.fit(seeds=seeds, domain=domain, periodic=periodic)
+
+    else:
+        generator = LaguerreDiagramGenerator(
+            tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=False
+        )
+        generator.fit(
+            seeds=seeds,
+            volumes=volumes,
+            domain=domain,
+            periodic=periodic,
+            init_weights=None,
+        )
+
     data = SynthetMicData(
         seeds=seeds,
         volumes=volumes,
@@ -507,7 +528,6 @@ def fit_data(
         periodic=periodic,
         init_weights=None,
     )
-    generator.fit(**asdict(data))
 
     return data, generator
 
@@ -544,7 +564,13 @@ def required() -> Callable[[Any], str | None]:
 
 def integer(allow_none: bool = False) -> Callable[[Any], str | None]:
     def rule(x: Any) -> bool:
-        return isinstance(x, int) or (x is None) if allow_none else isinstance(x, int)
+        if x is None:
+            if allow_none:
+                return True
+
+            return False
+
+        return isinstance(x, int)
 
     return lambda x: None if rule(x) else "An integer is required"
 
@@ -570,6 +596,40 @@ def between(
 
     return lambda x: (
         None if (rule(x) or x is None) else f"Must be between {left} and {right}"
+    )
+
+
+def req_gt(rhs: float) -> Callable:
+    return check.compose_rules(required(), gt(rhs=rhs))
+
+
+def req_int_gt(rhs: float) -> Callable:
+    return check.compose_rules(
+        required(),
+        integer(),
+        gt(rhs=rhs),
+    )
+
+
+def int_gte(rhs: float, allow_none: bool = False) -> Callable:
+    return check.compose_rules(
+        integer(allow_none=allow_none),
+        gte(rhs=rhs, allow_none=allow_none),
+    )
+
+
+def req_int_gte(rhs: float) -> Callable:
+    return check.compose_rules(
+        required(),
+        integer(),
+        gte(rhs=rhs),
+    )
+
+
+def req_between(left: float, right: float) -> Callable:
+    return check.compose_rules(
+        required(),
+        between(left=left, right=right),
     )
 
 
@@ -611,7 +671,7 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
     props = ("weights", "fitted_volumes")
     data = (diagram.weights, diagram.fitted_volumes)
 
-    if len(diagram.target_volumes) != 0:
+    if diagram.target_volumes is not None:
         props += ("target_volumems",)
         data += (diagram.target_volumes,)
 
@@ -659,7 +719,7 @@ def get_domain_measure(
 
 
 def calculate_metrics(diagram: Diagram) -> Metrics:
-    if diagram.target_volumes.size == 0:
+    if diagram.target_volumes is None:
         errors = np.array([])
         mean_percentage_error = None
         max_percentage_error = None
@@ -1096,3 +1156,13 @@ def calculate_num_vertices(
             raise ValueError(f"Invalid space_dim {space_dim}")
 
     return res, tot_num_uniq_verts
+
+
+def check_has_attribute(obj: object, attributes: list[str]) -> None:
+    for attr in attributes:
+        if not hasattr(obj, attr):
+            raise AttributeError(
+                f"""This {obj.__class__.__name__} instance does not have {attr} yet.
+                Call the appropriate method with appropriate arguments before using this instance.
+                """
+            )

@@ -6,7 +6,7 @@ from synthetmic import LaguerreDiagramGenerator
 from synthetmic.data import toy
 from synthetmic.data.utils import create_constant_volumes
 
-from shared.utils import calculate_num_vertices, fit_data
+from shared.utils import calculate_num_vertices, fit
 
 TEST_DATA = (
     (
@@ -46,7 +46,7 @@ def test_total_num_vertices(
 
     periodic = [False] * space_dim
 
-    _, gen = fit_data(
+    _, gen = fit(
         domain=domain,
         seeds=seeds,
         volumes=volumes,
@@ -87,7 +87,7 @@ def test_period_consistency(seeds: np.ndarray) -> None:
     pkg_generator.fit(seeds=seeds, volumes=volumes, domain=domain, periodic=periodic)
     pkg_count = [len(v) for v in pkg_generator.get_vertices().values()]
 
-    _, gui_generator = fit_data(
+    _, gui_generator = fit(
         domain=domain,
         seeds=seeds,
         volumes=volumes,

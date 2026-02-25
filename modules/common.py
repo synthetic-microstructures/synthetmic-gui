@@ -2,15 +2,18 @@ import tempfile
 from datetime import datetime
 
 import faicons
+from bs4 import BeautifulSoup
 from matplotlib import colormaps
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
+from synthetmic.data.utils import SynthetMicData
+from synthetmic.generate import DiagramGenerator
 
-import shared.controls as ct
-from shared import styles, utils, views
+from shared import comps, styles, utils
+from shared.consts import FILL_COLOUR, PLOT_DEFAULTS, Colorby, DiagramView, Tab
 
 
 @module.ui
-def page_ui() -> ui.Tag:
+def ui_() -> ui.Tag:
     return ui.tags.div(
         ui.output_ui("tab_radio_buttons"),
         ui.row(
@@ -32,14 +35,14 @@ def server(
     input: Inputs,
     output: Outputs,
     session: Session,
-    fitted_data: tuple[utils.SynthetMicData, utils.LaguerreDiagramGenerator],
+    fitted_data: tuple[SynthetMicData, DiagramGenerator],
     global_generate: reactive.Value,
 ) -> None:
     @reactive.calc
     def _calculate_diagram() -> utils.Diagram | Exception:
         data, generator = fitted_data
         match input.view():
-            case ct.DiagramView.FULL:
+            case DiagramView.FULL:
                 return utils.generate_full_diagram(
                     data=data,
                     generator=generator,
@@ -49,7 +52,7 @@ def server(
                     add_final_seed_positions=input.add_final_seed_positions(),
                 )
 
-            case ct.DiagramView.SLICE:
+            case DiagramView.SLICE:
                 # when slice view is selected (in 3D mode) and user
                 # changes mode to 2D (and then press generate); default to
                 # full view and quit.
@@ -68,7 +71,7 @@ def server(
                     opacity=input.opacity(),
                 )
 
-            case ct.DiagramView.CLIP:
+            case DiagramView.CLIP:
                 if (
                     len(data.domain) == 2
                     and input.clip_normal() == utils.COORDINATES[-1]
@@ -108,7 +111,7 @@ def server(
 
             case _:
                 return Exception(
-                    f"Invalid view '{input.view()}' provided. Value must be one of {', '.join(ct.DiagramView)}."
+                    f"Invalid view '{input.view()}' provided. Value must be one of {', '.join(DiagramView)}."
                 )
 
     @reactive.calc
@@ -125,10 +128,10 @@ def server(
         data, _ = fitted_data
         # to ensure the current plot settings are remembered after
         # reclicking generate button
-        if input.view() == ct.DiagramView.SLICE and len(data.domain) == 2:
+        if input.view() == DiagramView.SLICE and len(data.domain) == 2:
             ui.update_select(
                 id="view",
-                selected=ct.DiagramView.FULL,
+                selected=DiagramView.FULL,
             )
         else:
             ui.update_select(id="view", selected=input.view())
@@ -141,40 +144,40 @@ def server(
     @reactive.effect
     @reactive.event(input.reset_plot_options)
     def _():
-        ui.update_select(id="view", selected=ct.PLOT_DEFAULTS["view"])
-        ui.update_select(id="colorby", selected=ct.PLOT_DEFAULTS["colorby"])
-        ui.update_select(id="colormap", selected=ct.PLOT_DEFAULTS["colormap"])
-        ui.update_slider(id="opacity", value=ct.PLOT_DEFAULTS["opacity"])
+        ui.update_select(id="view", selected=PLOT_DEFAULTS["view"])
+        ui.update_select(id="colorby", selected=PLOT_DEFAULTS["colorby"])
+        ui.update_select(id="colormap", selected=PLOT_DEFAULTS["colormap"])
+        ui.update_slider(id="opacity", value=PLOT_DEFAULTS["opacity"])
 
     @render.ui
     def common_opts() -> ui.Tag:
         data, _ = fitted_data
-        view_choices = [v for v in ct.DiagramView]
+        view_choices = [v for v in DiagramView]
         if len(data.domain) == 2:
-            view_choices.remove(ct.DiagramView.SLICE)
+            view_choices.remove(DiagramView.SLICE)
 
         return ui.card(
             ui.card_header("Common plot options"),
             ui.tags.div(
-                views.create_selection(
+                comps.create_selection(
                     id="view",
                     label="Choose a diagram to view",
                     choices=view_choices,
-                    selected=ct.DiagramView.FULL,
+                    selected=DiagramView.FULL,
                     width="100%",
                 ),
-                views.create_selection(
+                comps.create_selection(
                     id="colorby",
                     label="Color by",
-                    choices=[c for c in ct.Colorby],
-                    selected=ct.PLOT_DEFAULTS["colorby"],
+                    choices=[c for c in Colorby],
+                    selected=PLOT_DEFAULTS["colorby"],
                     width="100%",
                 ),
-                views.create_selection(
+                comps.create_selection(
                     id="colormap",
                     label="Choose a colormap",
                     choices=sorted(list(colormaps)),
-                    selected=ct.PLOT_DEFAULTS["colormap"],
+                    selected=PLOT_DEFAULTS["colormap"],
                     width="100%",
                 ),
                 ui.input_slider(
@@ -182,11 +185,11 @@ def server(
                     label="Diagram opacity",
                     min=0.0,
                     max=1.0,
-                    value=ct.PLOT_DEFAULTS["opacity"],
+                    value=PLOT_DEFAULTS["opacity"],
                     ticks=True,
                     width="100%",
                 ),
-                views.create_input_action_button(
+                comps.create_input_action_button(
                     id="reset_plot_options",
                     label="Reset common plot options to defaults",
                     icon="gear",
@@ -211,7 +214,7 @@ def server(
         return ui.input_slider(
             id="slice_value",
             label="Value along the selected normal",
-            value=ct.PLOT_DEFAULTS["slice_value"],
+            value=PLOT_DEFAULTS["slice_value"],
             min=a,
             max=b,
             ticks=True,
@@ -247,7 +250,7 @@ def server(
 
         opts = ()
         match input.view():
-            case ct.DiagramView.FULL:
+            case DiagramView.FULL:
                 opts += (
                     ui.input_switch(
                         id="add_final_seed_positions",
@@ -256,9 +259,9 @@ def server(
                     ),
                 )
 
-            case ct.DiagramView.SLICE:
+            case DiagramView.SLICE:
                 opts += (
-                    views.create_selection(
+                    comps.create_selection(
                         id="slice_normal",
                         label="Choose a normal for slicing",
                         choices=list(utils.COORDINATES[: len(data.domain)]),
@@ -267,9 +270,9 @@ def server(
                     ),
                     ui.output_ui("slice_value_slider"),
                 )
-            case ct.DiagramView.CLIP:
+            case DiagramView.CLIP:
                 opts += (
-                    views.create_selection(
+                    comps.create_selection(
                         id="clip_normal",
                         label="Choose a normal for clipping",
                         choices=list(utils.COORDINATES[: len(data.domain)]),
@@ -301,10 +304,10 @@ def server(
 
     @render.ui
     def metrics_tab_card() -> ui.Tag | None:
-        if input.view() == ct.DiagramView.CLIP:
+        if input.view() == DiagramView.CLIP:
             return ui.card(
                 ui.card_header(
-                    faicons.icon_svg("circle-exclamation", fill=ct.FILL_COLOUR),
+                    faicons.icon_svg("circle-exclamation", fill=FILL_COLOUR),
                     "A note on metrics",
                 ),
                 ui.markdown(
@@ -317,7 +320,7 @@ def server(
 
         metrics = _calculate_metrics()
         if isinstance(metrics, Exception):
-            views.create_error_notification(str(metrics))
+            comps.create_error_notification(str(metrics))
             return
 
         @render.plot
@@ -337,7 +340,7 @@ def server(
             ui.span(
                 faicons.icon_svg(
                     "download",
-                    fill=ct.FILL_COLOUR,
+                    fill=FILL_COLOUR,
                 ),
                 style=styles.diagram_download_trigger,
             ),
@@ -351,7 +354,7 @@ def server(
                     """
                 )
             ),
-            views.create_download_button(
+            comps.create_download_button(
                 id="download_metrics",
                 label="Yes, download the current metrics",
             ),
@@ -416,7 +419,7 @@ def server(
     def diagram_tab_card() -> ui.Tag | None:
         diagram = _calculate_diagram()
         if isinstance(diagram, Exception):
-            views.create_error_notification(str(diagram))
+            comps.create_error_notification(str(diagram))
             return
 
         @render.ui
@@ -426,6 +429,8 @@ def server(
                 f.seek(0)
                 html = f.read().decode("utf-8")
 
+            soup = BeautifulSoup(html, "html.parser")
+            html = str(soup.body)
             return ui.HTML(html)
 
         @render.download(
@@ -439,7 +444,7 @@ def server(
             ui.span(
                 faicons.icon_svg(
                     "download",
-                    fill=ct.FILL_COLOUR,
+                    fill=FILL_COLOUR,
                 ),
                 style=styles.diagram_download_trigger,
             ),
@@ -451,7 +456,7 @@ def server(
                     "All outputs will be downloaded in .zip format which can be easily unzipped for futher processing."
                 )
             ),
-            views.create_download_button(
+            comps.create_download_button(
                 id="download_diagram",
                 label="Yes, download the current diagram and properties",
             ),
@@ -470,7 +475,7 @@ def server(
             ui.input_radio_buttons(
                 id="tab",
                 label=None,
-                choices=[t for t in ct.Tab],
+                choices=[t for t in Tab],
                 inline=True,
             ),
             style=styles.tab_radio_button,
@@ -480,7 +485,7 @@ def server(
     def selected_tab() -> ui.Tag:
         tabs = dict(
             zip(
-                ct.Tab,
+                Tab,
                 (ui.output_ui("diagram_tab_card"), ui.output_ui("metrics_tab_card")),
             )
         )

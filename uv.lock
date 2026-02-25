@@ -182,15 +182,15 @@ wheels = [
 
 [[package]]
 name = "beautifulsoup4"
-version = "4.13.5"
+version = "4.14.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "soupsieve" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/85/2e/3e5079847e653b1f6dc647aa24549d68c6addb4c595cc0d902d1b19308ad/beautifulsoup4-4.13.5.tar.gz", hash = "sha256:5e70131382930e7c3de33450a2f54a63d5e4b19386eab43a5b34d594268f3695", size = 622954, upload-time = "2025-08-24T14:06:13.168Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/b0/1c6a16426d389813b48d95e26898aff79abbde42ad353958ad95cc8c9b21/beautifulsoup4-4.14.3.tar.gz", hash = "sha256:6292b1c5186d356bba669ef9f7f051757099565ad9ada5dd630bd9de5fa7fb86", size = 627737, upload-time = "2025-11-30T15:08:26.084Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/eb/f4151e0c7377a6e08a38108609ba5cede57986802757848688aeedd1b9e8/beautifulsoup4-4.13.5-py3-none-any.whl", hash = "sha256:642085eaa22233aceadff9c69651bc51e8bf3f874fb6d7104ece2beb24b47c4a", size = 105113, upload-time = "2025-08-24T14:06:14.884Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/39/47f9197bdd44df24d67ac8893641e16f386c984a0619ef2ee4c51fbbc019/beautifulsoup4-4.14.3-py3-none-any.whl", hash = "sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb", size = 107721, upload-time = "2025-11-30T15:08:24.087Z" },
 ]
 
 [[package]]
@@ -1671,15 +1671,6 @@ wheels = [
 ]
 
 [[package]]
-name = "python-dotenv"
-version = "1.2.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f0/26/19cadc79a718c5edbec86fd4919a6b6d3f681039a2f6d66d14be94e75fb9/python_dotenv-1.2.1.tar.gz", hash = "sha256:42667e897e16ab0d66954af0e60a9caa94f0fd4ecf3aaf6d2d260eec1aa36ad6", size = 44221, upload-time = "2025-10-26T15:12:10.434Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/1b/a298b06749107c305e1fe0f814c6c74aea7b2f1e10989cb30f544a1b3253/python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61", size = 21230, upload-time = "2025-10-26T15:12:09.109Z" },
-]
-
-[[package]]
 name = "python-json-logger"
 version = "3.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2242,7 +2233,7 @@ wheels = [
 
 [[package]]
 name = "synthetmic"
-version = "0.1.5"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
@@ -2252,20 +2243,20 @@ dependencies = [
     { name = "scipy" },
     { name = "vtk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/e1/d8a8ddc3334bafb39316f35438febea035f60ab2a1690f9bca0af2334448/synthetmic-0.1.5.tar.gz", hash = "sha256:66be3d6ebe050aa7eca075abb98527821240caa5164868e4ce0d924851080315", size = 134212, upload-time = "2025-11-29T22:49:04.877Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9b/15/f8290c9cef290c30b042a1ba84a20d272512042938573ccb53367bd2c121/synthetmic-0.2.0.tar.gz", hash = "sha256:5f15c45162c5f4c1f37684c014fae0bcc0224a0c249fa8e7a2c331f93b110b62", size = 134946, upload-time = "2026-02-18T18:10:31.098Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/27/e1c685e3254a830442af46e9009c5b75f47ede7e827e0ec9d7eb4da8449e/synthetmic-0.1.5-py3-none-any.whl", hash = "sha256:ccae949ef630a035975ce48c75d227fb93120b362883aeb97c77f5097aabfcbc", size = 18114, upload-time = "2025-11-29T22:49:03.703Z" },
+    { url = "https://files.pythonhosted.org/packages/28/10/fa2caacae1f887594488a70881941cfc72fa34d2b1e6c10ba1808082c273/synthetmic-0.2.0-py3-none-any.whl", hash = "sha256:61811b9d41141ac587fef0c8e984c2a425c6448358cff15ceda0709c49911cd2", size = 18931, upload-time = "2026-02-18T18:10:30.154Z" },
 ]
 
 [[package]]
 name = "synthetmic-gui"
-version = "0.3.3"
+version = "0.3.4"
 source = { editable = "." }
 dependencies = [
+    { name = "beautifulsoup4" },
     { name = "faicons" },
     { name = "numpy" },
     { name = "pysdot" },
-    { name = "python-dotenv" },
     { name = "pyvista" },
     { name = "rsconnect-python" },
     { name = "seaborn" },
@@ -2286,18 +2277,18 @@ tests = [
 
 [package.metadata]
 requires-dist = [
+    { name = "beautifulsoup4", specifier = "==4.14.3" },
     { name = "faicons", specifier = ">=0.2.2" },
     { name = "numpy", specifier = "==2.3.2" },
     { name = "pysdot", specifier = "==0.2.38" },
     { name = "pytest", marker = "extra == 'tests'", specifier = ">=9.0.1" },
-    { name = "python-dotenv", specifier = "==1.2.1" },
     { name = "pyvista", specifier = "==0.46.5" },
     { name = "rsconnect-python", specifier = "==1.27.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shiny", specifier = "==1.5.1" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
     { name = "shinywidgets", specifier = ">=0.6.2" },
-    { name = "synthetmic", specifier = "==0.1.5" },
+    { name = "synthetmic", specifier = "==0.2.0" },
     { name = "tbx", marker = "extra == 'deploy'", git = "https://github.com/Rasheed19/tbx.git" },
     { name = "trame-vtk", specifier = "==2.9.1" },
 ]

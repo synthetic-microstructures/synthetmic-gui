@@ -8,16 +8,9 @@ tab_radio_button = (
 
 metrics_card: str = "height: 650px; overflow: hidden;"
 
-popover_modal_navbar: str = """
-        .popover {
-            max-width: 350px !important;
-            width: 350px !important;
-        }
-        .modal-dialog {
-                margin-top: 20px !important;
-                overflow-y: hidden !important;
-        } 
-        .navbar-nav {
-            justify-content: center !important;
-        }
-        """
+popover: str = """
+    .popover {
+        max-width: 350px !important;
+        width: 350px !important;
+    }
+"""
