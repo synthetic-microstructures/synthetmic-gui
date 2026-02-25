@@ -30,6 +30,7 @@ page_dependencies = ui.head_content(
 
 sidebar = comps.create_sidebar(
     ui.tags.div(
+        views.create_help("help"),
         comps.group_ui_elements(
             comps.create_selection(
                 id="diagram",
@@ -40,7 +41,6 @@ sidebar = comps.create_sidebar(
             title="Diagram",
             help_text="Your choice here will determine available options and inputs.",
         ),
-        views.create_help("help"),
         comps.group_ui_elements(
             comps.create_selection(
                 id="dim",
@@ -375,7 +375,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             input.phase() == Phase.SINGLE
             and input.single_phase_dist() == Distribution.LOGNORMAL
         ):
-            return views.compute_d90_text(
+            return laguerre.compute_d90_text(
                 mean=input.single_phase_mean(), std=input.single_phase_std()
             )
 
