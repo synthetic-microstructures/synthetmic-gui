@@ -8,6 +8,22 @@ with open("pyproject.toml", "rb") as f:
 
 APP_VERSION: str = f"v{pyproject_data['project']['version']}"
 APP_NAME: str = "SynthetMic-GUI"
+APP_AUTHORS: str = (
+    "Synthetic Microstructures Group, "
+    "School of Mathematical and Computer Sciences at Heriot-Watt University "
+    "and School of Mathematics and Statistics at the University of Glasgow"
+)
+APP_LICENSE: str = "The MIT License"
+APP_LINK: str = "https://david-bourne.shinyapps.io/synthetmic-gui/"
+
+MDICE_LINK: str = "https://mdice.site.hw.ac.uk/"
+MACS_LINK: str = (
+    "https://www.hw.ac.uk/about/our-schools/mathematical-and-computer-sciences"
+)
+MS_LINK: str = "https://www.gla.ac.uk/schools/mathematicsstatistics/"
+HW_LINK: str = "https://www.hw.ac.uk/"
+UOG_LINK: str = "https://www.gla.ac.uk/"
+
 FILL_COLOUR: str = "#0073CF"
 
 

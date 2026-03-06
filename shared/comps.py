@@ -6,7 +6,7 @@ from shiny import ui
 from shared.consts import FILL_COLOUR
 
 
-def create_sidebar(*args, **kwargs) -> ui.Sidebar:
+def sidebar(*args, **kwargs) -> ui.Sidebar:
     return ui.sidebar(
         *args,
         position="left",
@@ -17,7 +17,7 @@ def create_sidebar(*args, **kwargs) -> ui.Sidebar:
     )
 
 
-def create_download_button(id: str, label: str, icon: str = "download") -> ui.Tag:
+def download_button(id: str, label: str, icon: str = "download") -> ui.Tag:
     return ui.download_button(
         id=id,
         label=label,
@@ -27,7 +27,7 @@ def create_download_button(id: str, label: str, icon: str = "download") -> ui.Ta
     )
 
 
-def create_input_action_button(id: str, label: str, icon: str) -> ui.Tag:
+def input_action_button(id: str, label: str, icon: str) -> ui.Tag:
     return ui.input_action_button(
         id=id,
         label=label,
@@ -37,7 +37,7 @@ def create_input_action_button(id: str, label: str, icon: str) -> ui.Tag:
     )
 
 
-def create_input_task_button(id: str, label: str, icon: str) -> ui.Tag:
+def input_task_button(id: str, label: str, icon: str) -> ui.Tag:
     return ui.input_task_button(
         id=id,
         label=label,
@@ -47,7 +47,7 @@ def create_input_task_button(id: str, label: str, icon: str) -> ui.Tag:
     )
 
 
-def create_error_notification(msg: str) -> None:
+def error_notification(msg: str) -> None:
     ui.notification_show(
         msg,
         type="error",
@@ -57,7 +57,7 @@ def create_error_notification(msg: str) -> None:
     return None
 
 
-def create_selection(
+def selection(
     id: str, label: ui.TagChild, choices: list[Any], selected: Any, **props
 ) -> ui.Tag:
     return ui.input_select(
@@ -70,17 +70,18 @@ def create_selection(
     )
 
 
-def create_page_sidebar(*args, sidebar: ui.Sidebar, **props) -> ui.Tag:
+def page_sidebar(*args, sidebar: ui.Sidebar, **props) -> ui.Tag:
     return ui.page_sidebar(
         sidebar,
         *args,
+        title=None,
         fillable=True,
         fillable_mobile=True,
         **props,
     )
 
 
-def create_upload_handler(id: str, label: str) -> ui.Tag:
+def upload_handler(id: str, label: str) -> ui.Tag:
     return ui.input_file(
         id,
         label,
@@ -106,3 +107,11 @@ def group_ui_elements(
         ),
         *args,
     )
+
+
+def anchor_tag(*args, href: str, **props) -> ui.Tag:
+    return ui.tags.a(*args, href=href, target="_blank", **props)
+
+
+def anchor_html(text: str, link: str) -> str:
+    return f'<a href="{link}" target="_blank" rel="noopener noreferrer">{text}</a>'

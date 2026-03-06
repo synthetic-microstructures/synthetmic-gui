@@ -2253,7 +2253,6 @@ name = "synthetmic-gui"
 version = "0.3.4"
 source = { editable = "." }
 dependencies = [
-    { name = "beautifulsoup4" },
     { name = "faicons" },
     { name = "numpy" },
     { name = "pysdot" },
@@ -2277,7 +2276,6 @@ tests = [
 
 [package.metadata]
 requires-dist = [
-    { name = "beautifulsoup4", specifier = "==4.14.3" },
     { name = "faicons", specifier = ">=0.2.2" },
     { name = "numpy", specifier = "==2.3.2" },
     { name = "pysdot", specifier = "==0.2.38" },

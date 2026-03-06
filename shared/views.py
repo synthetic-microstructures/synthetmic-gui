@@ -7,7 +7,6 @@ from shared import comps
 from shared.consts import (
     APP_NAME,
     APP_VERSION,
-    DiagramType,
     Distribution,
 )
 from shared.utils import COORDINATES, VOLUMES
@@ -26,24 +25,8 @@ def app_version_text() -> ui.Tag:
     return (ui.help_text(f"{APP_NAME} {APP_VERSION}"),)
 
 
-def create_help(help_id: str) -> ui.Tag:
-    return ui.card(
-        ui.card_header("Help center"),
-        ui.markdown(
-            f"Need help? Read how to use {APP_NAME} by clicking the button below."
-        ),
-        comps.create_input_action_button(
-            id=help_id,
-            label="Click here for help and to see some examples",
-            icon="lightbulb",
-        ),
-    )
-
-
-def create_dist_selection(
-    id: str, label: str = "Choose a volume distribution"
-) -> ui.Tag:
-    return comps.create_selection(
+def dist_selection(id: str, label: str = "Choose a volume distribution") -> ui.Tag:
+    return comps.selection(
         id=id,
         label=label,
         choices=[d for d in Distribution],
@@ -51,9 +34,7 @@ def create_dist_selection(
     )
 
 
-def create_numeric_input(
-    ids: list[str], labels: list[str], defaults: list[Any]
-) -> ui.Tag:
+def numeric_input(ids: list[str], labels: list[str], defaults: list[Any]) -> ui.Tag:
     width = 12 // len(ids)
     cols = [
         ui.column(
@@ -145,61 +126,7 @@ def algo_help_text() -> ui.HTML:
     )
 
 
-def feedback_text() -> ui.Tag:
-    return ui.card(
-        ui.card_header("We'd love your feedback!"),
-        ui.markdown(
-            """
-            If you encounter any bugs or have suggestions, please
-            click [here](https://github.com/synthetic-microstructures/synthetmic-gui/issues)
-            to report them on app's GitHub. Thank you for helping us improve the app!
-
-            Check out the source code [here](https://github.com/synthetic-microstructures/synthetmic-gui)
-            on GitHub and see what's under the hood!
-            """
-        ),
-    )
-
-
-def about_text(app_name: str) -> ui.HTML:
-    return ui.markdown(
-        f"""
-        #### About
-
-        **{app_name}** is a web app for generating 2D and 3D synthetic
-        polycrystalline microstructures using Laguerre tessellations.
-        It uses the fast algorithms (developed in this
-        [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053))
-        for generating grains of prescribed volumes using optimal transport theory.
-        It is built on top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic)
-        and [pysdot](https://github.com/sd-ot/pysdot) packages.
-        """
-    )
-
-
-def info_modal(diagram_id: str) -> None:
-    ui.modal_show(
-        ui.modal(
-            ui.markdown(f"### {APP_NAME}"),
-            ui.hr(),
-            about_text(APP_NAME),
-            comps.create_selection(
-                id=diagram_id,
-                label="Choose a type of microstructure",
-                choices=[d for d in DiagramType],
-                selected=DiagramType.LAGUERRE,
-            ),
-            size="m",
-            easy_close=False,
-            footer=ui.modal_button(
-                "Close",
-                class_="btn btn-primary",
-            ),
-        )
-    )
-
-
-def create_periodic_input(ids: list[str], labels: list[str]) -> ui.Tag:
+def periodic_input(ids: list[str], labels: list[str]) -> ui.Tag:
     width = 12 // len(ids)
     cols = [
         ui.column(
