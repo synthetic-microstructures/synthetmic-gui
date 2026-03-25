@@ -161,7 +161,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                 return volumes
 
             n_grains = len(volumes)
-            tol = float(input.tol())
+            tol = input.tol()
 
         else:
             iv.add_rule("n_grains", utils.req_int_gt(rhs=0))
@@ -221,7 +221,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             periodic=list(periodic),
             tol=tol,
             n_iter=input.n_iter(),
-            damp_param=float(input.damp_param()),
+            damp_param=input.damp_param(),
         )
 
     @reactive.effect
