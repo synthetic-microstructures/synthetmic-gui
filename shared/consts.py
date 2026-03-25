@@ -1,6 +1,6 @@
 import tomllib
 from enum import StrEnum, auto
-from typing import Any
+from types import MappingProxyType
 
 with open("pyproject.toml", "rb") as f:
     pyproject_data = tomllib.load(f)
@@ -8,11 +8,7 @@ with open("pyproject.toml", "rb") as f:
 
 APP_VERSION: str = f"v{pyproject_data['project']['version']}"
 APP_NAME: str = "SynthetMic-GUI"
-APP_AUTHORS: str = (
-    "Synthetic Microstructures Group, "
-    "School of Mathematical and Computer Sciences at Heriot-Watt University "
-    "and School of Mathematics and Statistics at the University of Glasgow"
-)
+APP_AUTHORS: str = "R.O. Ibraheem, D.P. Bourne and S.M. Roper"
 APP_LICENSE: str = "The MIT License"
 APP_LINK: str = "https://david-bourne.shinyapps.io/synthetmic-gui/"
 
@@ -33,16 +29,16 @@ class DiagramType(StrEnum):
 
 
 class ExampleDataName(StrEnum):
-    BASIC = auto()
-    RANDOM = auto()
+    LOGNORMAL = auto()
+    EBSD = auto()
+    DP = auto()
     BANDED = auto()
     CLUSTERED = auto()
     MIXED = auto()
+    RANDOM = auto()
     INCREASING = auto()
     MIDDLE = auto()
-    DP = auto()
-    LOGNORMAL = auto()
-    EBSD = auto()
+    BASIC = auto()
 
 
 class Colorby(StrEnum):
@@ -103,12 +99,15 @@ class SeedInitializer(StrEnum):
     UPLOAD = auto()
 
 
-PLOT_DEFAULTS: dict[str, Any] = {
-    "view": DiagramView.FULL,
-    "colorby": Colorby.FITTED_VOLUMES,
-    "colormap": "plasma",
-    "opacity": 1.0,
-    "slice_value": 0.0,
-    "slice_normal": "x",
-    "clip_normal": "x",
-}
+PLOT_DEFAULTS: MappingProxyType = MappingProxyType(
+    {
+        "view": DiagramView.FULL,
+        "colorby": Colorby.FITTED_VOLUMES,
+        "colormap": "plasma",
+        "opacity": 1.0,
+        "slice_value": 0.0,
+        "slice_normal": "x",
+        "clip_normal": "x",
+        "add_final_seed_positions": False,
+    }
+)

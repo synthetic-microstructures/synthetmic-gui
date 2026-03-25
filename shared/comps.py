@@ -70,6 +70,25 @@ def selection(
     )
 
 
+def selectize(
+    id: str, label: ui.TagChild, choices: list[Any], selected: Any = None, **props
+) -> ui.Tag:
+    return ui.input_selectize(
+        id=id,
+        label=label,
+        choices=choices,
+        selected=choices[0] if selected is None else selected,
+        multiple=False,
+        remove_button=False,
+        options={
+            "maxOptions": 200,
+            "placeholder": "Enter text to search",
+            "create": False,
+        },
+        **props,
+    )
+
+
 def page_sidebar(*args, sidebar: ui.Sidebar, **props) -> ui.Tag:
     return ui.page_sidebar(
         sidebar,

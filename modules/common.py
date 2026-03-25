@@ -68,6 +68,7 @@ def server(
                     slice_value=input.slice_value(),
                     colormap=input.colormap(),
                     opacity=input.opacity(),
+                    add_final_seed_positions=input.add_final_seed_positions(),
                 )
 
             case DiagramView.CLIP:
@@ -99,6 +100,7 @@ def server(
                         clip_value=input.clip_value(),
                         invert=input.invert(),
                         add_remains_as_wireframe=input.add_remains_as_wireframe(),
+                        add_final_seed_positions=input.add_final_seed_positions(),
                         colormap=input.colormap(),
                         opacity=input.opacity(),
                     )
@@ -139,6 +141,9 @@ def server(
         ui.update_select(id="colorby", selected=input.colorby())
         ui.update_select(id="colormap", selected=input.colormap())
         ui.update_slider(id="opacity", value=input.opacity())
+        ui.update_switch(
+            id="add_final_seed_positions", value=input.add_final_seed_positions()
+        )
 
     @reactive.effect
     @reactive.event(input.reset_plot_options)
@@ -147,6 +152,10 @@ def server(
         ui.update_select(id="colorby", selected=PLOT_DEFAULTS["colorby"])
         ui.update_select(id="colormap", selected=PLOT_DEFAULTS["colormap"])
         ui.update_slider(id="opacity", value=PLOT_DEFAULTS["opacity"])
+        ui.update_switch(
+            id="add_final_seed_positions",
+            value=PLOT_DEFAULTS["add_final_seed_positions"],
+        )
 
     @render.ui
     def common_opts() -> ui.Tag:
@@ -174,7 +183,7 @@ def server(
                 ),
                 comps.selection(
                     id="colormap",
-                    label="Choose a colormap",
+                    label="Choose or search a colormap",
                     choices=sorted(list(colormaps)),
                     selected=PLOT_DEFAULTS["colormap"],
                     width="100%",
@@ -186,6 +195,11 @@ def server(
                     max=1.0,
                     value=PLOT_DEFAULTS["opacity"],
                     ticks=True,
+                    width="100%",
+                ),
+                ui.input_switch(
+                    id="add_final_seed_positions",
+                    label="Add final seed positions",
                     width="100%",
                 ),
                 comps.input_action_button(
@@ -250,13 +264,7 @@ def server(
         opts = ()
         match input.view():
             case DiagramView.FULL:
-                opts += (
-                    ui.input_switch(
-                        id="add_final_seed_positions",
-                        label="Add final seed positions",
-                        width="100%",
-                    ),
-                )
+                return
 
             case DiagramView.SLICE:
                 opts += (
@@ -425,7 +433,6 @@ def server(
                 f.seek(0)
                 html = f.read().decode("utf-8")
 
-            # return ui.HTML(html)
             return ui.tags.iframe(
                 srcdoc=html, style="width:100%; height:100%; border:none;"
             )

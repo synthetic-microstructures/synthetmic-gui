@@ -364,5 +364,4 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             comps.error_notification(str(f))
 
         else:
-            ui.update_sidebar(id="sidebar", show=False)
             common.server("common", f, input.generate)

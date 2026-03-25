@@ -7,3 +7,10 @@ tab_radio_button = (
 )
 
 metrics_card: str = "height: 650px; overflow: hidden;"
+
+popover: str = """
+    .popover {
+        max-width: 350px !important;
+        width: 350px !important;
+    }
+"""

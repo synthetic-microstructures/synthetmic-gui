@@ -7,7 +7,6 @@ from shiny.types import ImgData
 from shared import comps, utils, views
 from shared.consts import (
     APP_AUTHORS,
-    APP_LICENSE,
     APP_LINK,
     APP_NAME,
     APP_VERSION,
@@ -28,7 +27,7 @@ def citation_text() -> ui.TagList:
             f"""
             If you use this app in any publication or report, please cite it as follows:
 
-            > {APP_AUTHORS} (2025). *{APP_NAME} ({APP_VERSION})* [Web application]. {APP_LINK} [{APP_LICENSE}].
+            > {APP_AUTHORS} (2025). *{APP_NAME} ({APP_VERSION})* [Software]. Avaialable from {APP_LINK}.
             """
         ),
     )
@@ -117,7 +116,7 @@ def about_text() -> ui.TagList:
         It uses the fast algorithms (developed in this
         {comps.anchor_html("paper", "https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053")})
         for generating grains of prescribed volumes using optimal transport theory.
-        It is built on top of {comps.anchor_html("SynthetMic", "https://github.com/synthetic-microstructures/synthetmic")}
+        It is built on top of the {comps.anchor_html("SynthetMic", "https://github.com/synthetic-microstructures/synthetmic")}
         and {comps.anchor_html("pysdot", "https://github.com/sd-ot/pysdot")} packages.
         """
         ),
@@ -129,42 +128,41 @@ def usage_text() -> ui.TagList:
         ui.tags.h4("Usage"),
         ui.markdown(
             """
-        Using the app is extremely easy. It can be done in **4 steps**:
-        1. Specify both the space and box dimension. You can optionally
-        choose whether the underlying domain should be periodic in a given coordinate.
-        1. Specify the number of grains and how target volumes will be generated.
-        We support single and dual phase volumes specification. You
+        Using the app is extremely easy. It can be done in **5 steps**:
+        1. Click on the **Microstructure generation** tab above to begin.
+        1. Specify the space dimension and box size. You can optionally
+        choose whether the underlying domain is periodic in a given coordinate.
+        1. Specify the number of grains and how the target volumes will be generated.
+        We support single- and dual-phase microstructures. You
         can also upload your custom target volumes instead. Note that if
-        Voronoi diagram option is chosen, there is no need to specify
+        the Voronoi diagram option is chosen, there is no need to specify
         target volumes.
-        1. Click on **Generate miscrostructure** button to generate synthetic miscrostructure.
-        1. Click on any of the **download buttons** to either download
-        the generated diagram (in different formats!) or the diagram properties
-        (like centroids, vertices, etc; also in different formats!).
+        1. Click on the **Generate microstructure** button.
+        1. Click on the **download buttons** to either download
+        the generated diagram or the diagram properties
+        (like centroids, vertices, etc.).
 
-        That is it!
-
-        Enjoy generating microstructures!"""
+        That is it! Enjoy generating microstructures!"""
         ),
     )
 
 
 def starting_point_text() -> ui.TagList:
     return ui.TagList(
-        ui.h4("Upload option: starting point"),
+        ui.h4("Upload option: Examples"),
         ui.markdown(
             """
-        Here, we provide some examples to showcase how to use the **upload** options of the app.
+        Here we provide some examples to showcase how to use the **upload** options of the app.
         This is useful when you want to upload your own target volumes and/or seeds to have more
         control on the generated microstructures.
 
-        Select and download one of our example data below. You can then upload them
+        Select and download one of our example data sets below. You can then upload the data
         in the main app to generate the corresponding microstructure. When you click the 
         download button, the seeds, volumes and domain of the underlying microstructure will be
         downloaded in the selected format, which are zipped. Unzip to access the files.
 
-        Ensure you enter the correct dimension in the **Box dimension** input. You can read this from 
-        the *dimension.txt* or *dimension.csv* file."""
+        Ensure you enter the correct dimension in the **Box dimension** input.
+        You can read this from the *dimension.txt* or *dimension.csv* file."""
         ),
     )
 
@@ -184,7 +182,7 @@ def create_example_data_card(
                 This is an example of a basic synthetic microstructure with a 
                 random seed initialization and constant volume distribution.
                 """
-            tags = "2D, random seed, constant volumes, "
+            tags = "Laguerre, 2D, random seed, constant volumes, "
 
         case ExampleDataName.RANDOM:
             info = """
@@ -192,7 +190,7 @@ def create_example_data_card(
                 generator locations of the large and small grains are uniformly
                 distributed over the corresponding domain.
                 """
-            tags = "2D, dual-phase volumes, random seeds, "
+            tags = "Laguerre, 2D, dual-phase volumes, random seeds, "
 
         case ExampleDataName.BANDED:
             info = """
@@ -204,7 +202,7 @@ def create_example_data_card(
                 small-grain band and approximately equal numbers of large grains
                 within each large-grain band.
                 """
-            tags = "2D, dual-phase volumes, banded seeds, "
+            tags = "Laguerre, 2D, dual-phase volumes, banded seeds, "
 
         case ExampleDataName.CLUSTERED:
             info = """
@@ -212,7 +210,7 @@ def create_example_data_card(
                 Here, the smaller grains have initial generator locations
                 that lie inside non-overlapping discs.
                 """
-            tags = "2D, dual-phase volumes, clustered seeds, "
+            tags = "Laguerre, 2D, dual-phase volumes, clustered seeds, "
 
         case ExampleDataName.MIXED:
             info = """
@@ -220,44 +218,48 @@ def create_example_data_card(
                 such that the larger grains are arranged in bands and
                 the smaller grains are a combination of the banded and random distributions.
                 """
-            tags = "2D, dual-phase volumes, mixed seeds, "
+            tags = "Laguerre, 2D, dual-phase volumes, mixed seeds, "
 
         case ExampleDataName.INCREASING:
             info = """
                 The initial seed locations are distributed such that the 𝑥-coordinate
                 increases with grain size.
                 """
-            tags = "2D, multi-phase volumes, increasing grain size, "
+            tags = "Laguerre, 2D, multi-phase volumes, increasing grain size, "
 
         case ExampleDataName.MIDDLE:
             info = """
                 The initial seed locations are distributed such that
                 the larger grains are found in the middle of the domain.
                 """
-            tags = "2D, multi-phase volumes, divergent grain size, "
+            tags = "Laguerre, 2D, multi-phase volumes, divergent grain size, "
 
         case ExampleDataName.DP:
             info = """
                 An RVE of a dual-phase material with a banded microstructure.
                 """
-            tags = "3D, RVE, dual-phase, banded structure, "
+            tags = "Laguerre, 3D, RVE, dual-phase, banded structure, "
 
         case ExampleDataName.LOGNORMAL:
             info = """
-                An RVE in which the grain volumes have approximately lognormal distribution
+                An RVE in which the grain volumes have an approximately lognormal distribution.
                 The coefficient of variation of the volumes (the ratio of the standard
                 deviation to the mean) is 1.4.
+
+                For more information, see Example 5.5 of this
+                [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053#d1e7431).
                 """
-            tags = "3D, RVE, lognormal volumes, banded structure, "
+            tags = "Laguerre, 3D, RVE, lognormal volumes, banded structure, "
 
         case ExampleDataName.EBSD:
             info = """
             In this example we fit a Laguerre diagram to an EBSD image of a
             single-phase steel. The 'target volumes'
-            are the areas of the grains in the EBSD image. The 'seeds' are the centroids of the grains
-            in the EBSD image. The EBSD data is taken from this [paper](https://doi.org/10.1051/m2an/2025004).
+            are the areas of the grains in the EBSD image. The 'seeds' are the
+            centroids of the grains in the EBSD image. The EBSD data is taken
+            from this [paper](https://doi.org/10.1051/m2an/2025004).
             """
-            tags = "2D, non-periodic, volume upload, seed upload, volume tolerance = 1, Lloyd iterations = 0, damp param = 1"
+            tags = "Laguerre, 2D, non-periodic, volume upload, seed upload, volume tolerance = 1, Lloyd iterations = 0, damp param = 1"
 
         case _:
             raise ValueError(
@@ -296,7 +298,7 @@ def ui_() -> ui.Tag:
                         id="example_data",
                         label="Choose an example data to download",
                         choices=[e for e in ExampleDataName],
-                        selected=ExampleDataName.BASIC,
+                        selected=ExampleDataName.EBSD,
                         width="100%",
                     ),
                     comps.selection(

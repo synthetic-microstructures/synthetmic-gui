@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12.3"
 dependencies = [
     "pysdot==0.2.38",
-    "synthetmic==0.2.0",
+    "synthetmic==0.2.2",
     "faicons>=0.2.2",
     "numpy==2.3.2",
     "rsconnect-python==1.27.0",
