@@ -1,6 +1,6 @@
 import tomllib
 from enum import StrEnum, auto
-from typing import Any
+from types import MappingProxyType
 
 with open("pyproject.toml", "rb") as f:
     pyproject_data = tomllib.load(f)
@@ -8,6 +8,20 @@ with open("pyproject.toml", "rb") as f:
 
 APP_VERSION: str = f"v{pyproject_data['project']['version']}"
 APP_NAME: str = "SynthetMic-GUI"
+APP_AUTHORS: str = "R.O. Ibraheem, D.P. Bourne and S.M. Roper"
+APP_LICENSE: str = "The MIT License"
+APP_LINK: str = "https://david-bourne.shinyapps.io/synthetmic-gui/"
+
+MDICE_LINK: str = "https://mdice.site.hw.ac.uk/"
+MACS_LINK: str = (
+    "https://www.hw.ac.uk/about/our-schools/mathematical-and-computer-sciences"
+)
+MS_LINK: str = "https://www.gla.ac.uk/schools/mathematicsstatistics/"
+HW_LINK: str = "https://www.hw.ac.uk/"
+UOG_LINK: str = "https://www.gla.ac.uk/"
+
+ALGO_PAPER_LINK: str = "https://doi.org/10.1080/14786435.2020.1790053"
+
 FILL_COLOUR: str = "#0073CF"
 
 
@@ -17,16 +31,17 @@ class DiagramType(StrEnum):
 
 
 class ExampleDataName(StrEnum):
-    BASIC = auto()
-    RANDOM = auto()
-    BANDED = auto()
-    CLUSTERED = auto()
-    MIXED = auto()
-    INCREASING = auto()
-    MIDDLE = auto()
-    DP = auto()
-    LOGNORMAL = auto()
-    EBSD = auto()
+    EBSD = "EBSD"
+    LOGNORMAL = "Lognormal"
+    BANDED_PERIODIC = "Banded periodic"
+    DUAL_PHASE = "Dual phase"
+    BASIC = "Basic"
+    RANDOM = "Random"
+    BANDED = "Banded"
+    MIXED = "Mixed"
+    CLUSTERED = "Clustered"
+    INCREASING = "Increasing"
+    MIDDLE = "Middle"
 
 
 class Colorby(StrEnum):
@@ -87,12 +102,15 @@ class SeedInitializer(StrEnum):
     UPLOAD = auto()
 
 
-PLOT_DEFAULTS: dict[str, Any] = {
-    "view": DiagramView.FULL,
-    "colorby": Colorby.FITTED_VOLUMES,
-    "colormap": "plasma",
-    "opacity": 1.0,
-    "slice_value": 0.0,
-    "slice_normal": "x",
-    "clip_normal": "x",
-}
+PLOT_DEFAULTS: MappingProxyType = MappingProxyType(
+    {
+        "view": DiagramView.FULL,
+        "colorby": Colorby.FITTED_VOLUMES,
+        "colormap": "plasma",
+        "opacity": 1.0,
+        "slice_value": 0.0,
+        "slice_normal": "x",
+        "clip_normal": "x",
+        "add_final_seed_positions": False,
+    }
+)

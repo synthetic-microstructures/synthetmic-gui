@@ -1,6 +1,7 @@
 # SynthetMic-GUI
 ### About
-SynthetMic-GUI is a web app for generating 2D and 3D synthetic polycrystalline microstructures using Laguerre tessellations.
+SynthetMic-GUI is a web app for generating 2D and 3D synthetic polycrystalline
+microstructures using Voronoi and Laguerre tessellations.
 It uses the fast algorithms (developed in this [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053))
 for generating grains of prescribed volumes using optimal transport theory. It is built on
 top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) and [pysdot](https://github.com/sd-ot/pysdot) packages.
@@ -8,7 +9,11 @@ top of [SynthetMic](https://github.com/synthetic-microstructures/synthetmic) and
 This app is available at this [link](https://david-bourne.shinyapps.io/synthetmic-gui/).
 
 ### Local set up
-If you would like to build this project from source either for development purposes or for any other reason, it is recommended to install [uv](https://docs.astral.sh/uv/). This is what is adopted in this project. To install uv, follow the instructions in this [link](https://docs.astral.sh/uv/getting-started/installation/).
+If you would like to build this project from source either
+for development purposes or for any other reason, it is
+recommended to install [uv](https://docs.astral.sh/uv/). This
+is what is adopted in this project.
+To install uv, follow the instructions in this [link](https://docs.astral.sh/uv/getting-started/installation/).
 
 If you don't want to use uv, you can use other alternatives like [pip](https://pip.pypa.io/en/stable/).
 
@@ -50,3 +55,8 @@ The following instructions use uv for setting up the app locally.
 - [D. P. Bourne](https://github.com/DPBourne)
 - [S. M. Roper](https://github.com/smr29git)
 
+### Citation
+If you use this app in any publication or report, please cite it as follows:
+
+> R.O. Ibraheem, D.P. Bourne and S.M. Roper (2025). SynthetMic-GUI (v0.4.0)
+> [Software]. Avaialable from https://david-bourne.shinyapps.io/synthetmic-gui/.

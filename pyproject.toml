@@ -1,12 +1,12 @@
 [project]
 name = "synthetmic-gui"
-version = "0.3.4"
+version = "0.4.0"
 description = "A GUI for generating synthetic Laguerre polycrystalline microstructures"
 readme = "README.md"
 requires-python = ">=3.12.3"
 dependencies = [
     "pysdot==0.2.38",
-    "synthetmic==0.2.0",
+    "synthetmic==0.2.2",
     "faicons>=0.2.2",
     "numpy==2.3.2",
     "rsconnect-python==1.27.0",
@@ -16,7 +16,6 @@ dependencies = [
     "shinywidgets>=0.6.2",
     "pyvista==0.46.5",
     "trame-vtk==2.9.1",
-    "beautifulsoup4==4.14.3",
 ]
 
 [project.optional-dependencies]

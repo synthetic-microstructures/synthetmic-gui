@@ -645,6 +645,15 @@ wheels = [
 ]
 
 [[package]]
+name = "joblib"
+version = "1.5.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/41/f2/d34e8b3a08a9cc79a50b2208a93dce981fe615b64d5a4d4abee421d898df/joblib-1.5.3.tar.gz", hash = "sha256:8561a3269e6801106863fd0d6d84bb737be9e7631e33aaed3fb9ce5953688da3", size = 331603, upload-time = "2025-12-15T08:41:46.427Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl", hash = "sha256:5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713", size = 309071, upload-time = "2025-12-15T08:41:44.973Z" },
+]
+
+[[package]]
 name = "jsonpointer"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2233,9 +2242,10 @@ wheels = [
 
 [[package]]
 name = "synthetmic"
-version = "0.2.0"
+version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "joblib" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pysdot" },
@@ -2243,17 +2253,16 @@ dependencies = [
     { name = "scipy" },
     { name = "vtk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/15/f8290c9cef290c30b042a1ba84a20d272512042938573ccb53367bd2c121/synthetmic-0.2.0.tar.gz", hash = "sha256:5f15c45162c5f4c1f37684c014fae0bcc0224a0c249fa8e7a2c331f93b110b62", size = 134946, upload-time = "2026-02-18T18:10:31.098Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/ff/2df4cffc938d7ad170b2a4e8581e27adfabb675ebcf47c54835287d2b846/synthetmic-0.2.2.tar.gz", hash = "sha256:5fc072070de081023e5736fd95c0ac905cbab40164d2e132cf005068ceac47f4", size = 145957, upload-time = "2026-03-25T16:17:09.211Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/28/10/fa2caacae1f887594488a70881941cfc72fa34d2b1e6c10ba1808082c273/synthetmic-0.2.0-py3-none-any.whl", hash = "sha256:61811b9d41141ac587fef0c8e984c2a425c6448358cff15ceda0709c49911cd2", size = 18931, upload-time = "2026-02-18T18:10:30.154Z" },
+    { url = "https://files.pythonhosted.org/packages/32/12/6ec901a9e85a0748d12679be595c5980f7f5c165857cf922870a375fb661/synthetmic-0.2.2-py3-none-any.whl", hash = "sha256:c7e63369922db2b2810bbfb17ee4ab514e7db51666865428f8a64b3190e17338", size = 19924, upload-time = "2026-03-25T16:17:07.911Z" },
 ]
 
 [[package]]
 name = "synthetmic-gui"
-version = "0.3.4"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
-    { name = "beautifulsoup4" },
     { name = "faicons" },
     { name = "numpy" },
     { name = "pysdot" },
@@ -2277,7 +2286,6 @@ tests = [
 
 [package.metadata]
 requires-dist = [
-    { name = "beautifulsoup4", specifier = "==4.14.3" },
     { name = "faicons", specifier = ">=0.2.2" },
     { name = "numpy", specifier = "==2.3.2" },
     { name = "pysdot", specifier = "==0.2.38" },
@@ -2288,7 +2296,7 @@ requires-dist = [
     { name = "shiny", specifier = "==1.5.1" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
     { name = "shinywidgets", specifier = ">=0.6.2" },
-    { name = "synthetmic", specifier = "==0.2.0" },
+    { name = "synthetmic", specifier = "==0.2.2" },
     { name = "tbx", marker = "extra == 'deploy'", git = "https://github.com/Rasheed19/tbx.git" },
     { name = "trame-vtk", specifier = "==2.9.1" },
 ]

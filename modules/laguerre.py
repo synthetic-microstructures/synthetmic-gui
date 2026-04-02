@@ -5,97 +5,16 @@ from shiny_validate import InputValidator
 
 from shared import comps, utils, views
 from shared.consts import (
-    APP_NAME,
     Distribution,
-    ExampleDataName,
     Phase,
-    PropertyExtension,
 )
-
-
-def help(data_selection_id: str, data_extension_id: str, data_card_id: str) -> None:
-    ui.modal_show(
-        ui.modal(
-            ui.markdown(f"### {APP_NAME}"),
-            ui.hr(),
-            ui.markdown(
-                """
-                #### Usage
-
-                Using the app is extremely easy. It can be done in **4 steps**:
-                1. Specify both the space and box dimension. You can optionally
-                choose whether the underlying domain should be periodic in all directions.
-                1. Specify the number of grains and how target volumes will be generated.
-                We support single and dual phase volumes specification. You
-                can also upload your custom target volumes instead.
-                1. Click on **Generate miscrostructure** button to generate synthetic miscrostructure.
-                1. Click on any of the **download buttons** to either download
-                the generated diagram (in different formats!) or the diagram properties
-                (like centroids, vertices, etc; also in differnt formats!).
-
-                That is it!
-
-                Enjoy generating microstructures!
-                """
-            ),
-            ui.hr(),
-            ui.markdown("#### Starting point"),
-            ui.markdown(
-                """
-                Don't know where to start yet?
-
-                Don't worry, we've got you covered!
-
-                Select and download one of our example data below. You can then upload them
-                in the main app to generate the corresponding microstructure. When you click the 
-                download button, the seeds, volumes and domain of the underlying microstructure will be
-                downloaded in the selected format, which are zipped. Unzip to access the files.
-
-                Ensure you enter the correct dimension in the 'Box dimension' input. You can read this from 
-                the dimension.txt or dimension.csv file.
-                """
-            ),
-            ui.row(
-                ui.column(
-                    4,
-                    ui.card(
-                        ui.card_header("Options center"),
-                        comps.create_selection(
-                            id=data_selection_id,
-                            label="Choose an example data to download",
-                            choices=[e for e in ExampleDataName],
-                            selected=ExampleDataName.BASIC,
-                            width="100%",
-                        ),
-                        comps.create_selection(
-                            id=data_extension_id,
-                            label="Choose a file extension for the example data",
-                            choices=[e for e in PropertyExtension],
-                            selected=PropertyExtension.CSV,
-                            width="100%",
-                        ),
-                    ),
-                ),
-                ui.column(
-                    8,
-                    ui.output_ui(data_card_id),
-                ),
-            ),
-            size="l",
-            easy_close=True,
-            footer=ui.modal_button(
-                "Close",
-                class_="btn btn-primary",
-            ),
-        )
-    )
 
 
 def phase_input(n: int) -> ui.Tag:
     return ui.row(
         ui.column(
             4,
-            views.create_dist_selection(
+            views.dist_selection(
                 id=f"phase{n}_dist", label=f"Phase {n} volume distribution"
             ),
         ),
@@ -120,7 +39,7 @@ def phase_input(n: int) -> ui.Tag:
 
 def sidebar() -> ui.Tag:
     return comps.group_ui_elements(
-        comps.create_selection(
+        comps.selection(
             id="phase",
             label="Choose a phase",
             choices=[p for p in Phase],
@@ -138,7 +57,7 @@ def sidebar() -> ui.Tag:
                             value=1000,
                         ),
                     ),
-                    ui.column(6, views.create_dist_selection(id="single_phase_dist")),
+                    ui.column(6, views.dist_selection(id="single_phase_dist")),
                 ),
                 ui.output_ui("single_phase_dist_param"),
             ),
@@ -146,7 +65,7 @@ def sidebar() -> ui.Tag:
         ui.panel_conditional(
             f"input.phase === '{Phase.UPLOAD}'",
             ui.tags.div(
-                comps.create_upload_handler(
+                comps.upload_handler(
                     "uploaded_volumes",
                     "Upload volumes as a csv or txt file",
                 ),
@@ -203,7 +122,7 @@ def create_dist_params(
 
         case Distribution.UNIFORM:
             return ui.tags.div(
-                views.create_numeric_input(
+                views.numeric_input(
                     ids=[f"{id_prefix}_{p}" for p in ("low", "high")],
                     labels=["Low", "High"],
                     defaults=[1, 2],
@@ -215,7 +134,7 @@ def create_dist_params(
 
         case Distribution.LOGNORMAL:
             return ui.tags.div(
-                views.create_numeric_input(
+                views.numeric_input(
                     ids=[f"{id_prefix}_{p}" for p in ("mean", "std")],
                     labels=["ECD Mean", "ECD Std"],
                     defaults=[1, 0.35],
@@ -360,116 +279,6 @@ def volumes(
             return Exception(
                 f"Mismatch phase: {input.phase()}. Input must be one of {', '.join(Phase)}."
             )
-
-
-def create_example_data_card(
-    name: str,
-    image_id: str,
-    download_id: str,
-) -> ui.Tag:
-    common_tags = """
-        volume tolerance=1.0%, Lloyd iterations=20, damp param=1.0, 
-        colorby=fitted volumes, colormap=plasma.
-        """
-
-    match name:
-        case ExampleDataName.BASIC:
-            info = """
-                This is an example of a basic synthetic microstructure with a 
-                random seed initialization and constant volume distribution.
-                """
-            tags = "2D, random seed, constant volumes, "
-
-        case ExampleDataName.RANDOM:
-            info = """
-                Random distribution of initial seed locations. Here the initial
-                generator locations of the large and small grains are uniformly
-                distributed over the corresponding domain.
-                """
-            tags = "2D, dual-phase volumes, random seeds, "
-
-        case ExampleDataName.BANDED:
-            info = """
-                Banded distribution of initial seed locations.
-                Here, the different sized grains have initial generator
-                locations that lie inside bands within the domain.
-                The sizes of the bands have been chosen so that there are
-                approximately equal numbers of small grains within each
-                small-grain band and approximately equal numbers of large grains
-                within each large-grain band.
-                """
-            tags = "2D, dual-phase volumes, banded seeds, "
-
-        case ExampleDataName.CLUSTERED:
-            info = """
-                Clustered distribution of initial seed locations. 
-                Here, the smaller grains have initial generator locations
-                that lie inside non-overlapping discs.
-                """
-            tags = "2D, dual-phase volumes, clustered seeds, "
-
-        case ExampleDataName.MIXED:
-            info = """
-                A mixed distribution: the initial generators are
-                such that the larger grains are arranged in bands and
-                the smaller grains are a combination of the banded and random distributions.
-                """
-            tags = "2D, dual-phase volumes, mixed seeds, "
-
-        case ExampleDataName.INCREASING:
-            info = """
-                The initial seed locations are distributed such that the 𝑥-coordinate
-                increases with grain size.
-                """
-            tags = "2D, multi-phase volumes, increasing grain size, "
-
-        case ExampleDataName.MIDDLE:
-            info = """
-                The initial seed locations are distributed such that
-                the larger grains are found in the middle of the domain.
-                """
-            tags = "2D, multi-phase volumes, divergent grain size, "
-
-        case ExampleDataName.DP:
-            info = """
-                An RVE of a dual-phase material with a banded microstructure.
-                """
-            tags = "3D, RVE, dual-phase, banded structure, "
-
-        case ExampleDataName.LOGNORMAL:
-            info = """
-                An RVE in which the grain volumes have approximately lognormal distribution
-                The coefficient of variation of the volumes (the ratio of the standard
-                deviation to the mean) is 1.4.
-                """
-            tags = "3D, RVE, lognormal volumes, banded structure, "
-
-        case ExampleDataName.EBSD:
-            info = """
-            In this example we fit a Laguerre diagram to an EBSD image of a
-            single-phase steel. The 'target volumes'
-            are the areas of the grains in the EBSD image. The 'seeds' are the centroids of the grains
-            in the EBSD image. The EBSD data is taken from this [paper](https://doi.org/10.1051/m2an/2025004).
-            """
-            tags = "2D, non-periodic, volume upload, seed upload, volume tolerance = 1, Lloyd iterations = 0, damp param = 1"
-
-        case _:
-            raise ValueError(
-                f"Invalid data name '{name}'; name must be one of [{', '.join(ExampleDataName)}]."
-            )
-
-    return ui.card(
-        ui.card_header(name),
-        ui.output_image(image_id, fill=True, height="100%", width="100%"),
-        ui.markdown(info),
-        ui.help_text(
-            f"Tags: {tags}{'' if name == ExampleDataName.EBSD else common_tags}"
-        ),
-        comps.create_download_button(
-            id=download_id,
-            label="Download data",
-        ),
-    )
 
 
 def compute_d90_text(mean: float, std: float) -> str | None:

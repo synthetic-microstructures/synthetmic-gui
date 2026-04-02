@@ -212,6 +212,22 @@ def prepare_mesh(
     return mesh, clim
 
 
+def add_points(plotter: pv.Plotter, points: np.ndarray) -> None:
+    n_samples, space_dim = points.shape
+
+    if space_dim == 2:
+        points = np.column_stack((points, np.zeros(n_samples)))
+
+    plotter.add_points(
+        points=points,
+        render_points_as_spheres=True,
+        color="black",
+        point_size=5,
+    )
+
+    return None
+
+
 def generate_clip_diagram(
     data: SynthetMicData,
     generator: DiagramGenerator,
@@ -220,6 +236,7 @@ def generate_clip_diagram(
     clip_value: float,
     invert: bool,
     add_remains_as_wireframe: bool,
+    add_final_seed_positions: bool = False,
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
     opacity: float = 1.0,
@@ -287,6 +304,10 @@ def generate_clip_diagram(
             clim=clim,
         )
 
+    if add_final_seed_positions:
+        final_seed_positions = generator.get_positions()
+        add_points(plotter=pl, points=final_seed_positions)
+
     if len(data.domain) == 2:
         pl.camera_position = "xy"
 
@@ -322,9 +343,6 @@ def generate_full_diagram(
         colorby=colorby,
     )
 
-    final_seed_positions = generator.get_positions()
-    n_samples, space_dim = final_seed_positions.shape
-
     pl = pv.Plotter(
         off_screen=True,
         window_size=list(window_size),
@@ -341,21 +359,12 @@ def generate_full_diagram(
         clim=clim,
     )
 
-    if space_dim == 2:
-        pl.camera_position = "xy"
-
     if add_final_seed_positions:
-        if space_dim == 2:
-            final_seed_positions = np.column_stack(
-                (final_seed_positions, np.zeros(n_samples))
-            )
+        final_seed_positions = generator.get_positions()
+        add_points(plotter=pl, points=final_seed_positions)
 
-        pl.add_points(
-            points=final_seed_positions,
-            render_points_as_spheres=True,
-            color="black",
-            point_size=5,
-        )
+    if len(data.domain) == 2:
+        pl.camera_position = "xy"
 
     return Diagram(
         centroids=generator.get_centroids(),
@@ -380,6 +389,7 @@ def generate_slice_diagram(
     colormap: str = "plasma",
     window_size: tuple[int, int] = (400, 400),
     opacity: float = 1.0,
+    add_final_seed_positions: bool = False,
 ) -> Diagram:
     def _sort_normals(normal: str) -> list[str]:
         normals = [c for c in COORDINATES if c != normal]
@@ -457,7 +467,6 @@ def generate_slice_diagram(
         fitted_volumes=generator.get_fitted_volumes(),
         colorby=colorby,
     )
-
     pl = pv.Plotter(
         off_screen=True,
         window_size=list(window_size),
@@ -472,6 +481,8 @@ def generate_slice_diagram(
         scalars="vols",
         clim=clim,
     )
+    if add_final_seed_positions:
+        add_points(plotter=pl, points=seeds)
     pl.camera_position = "xy"
 
     vertices = {}
@@ -672,7 +683,7 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
     data = (diagram.weights, diagram.fitted_volumes)
 
     if diagram.target_volumes is not None:
-        props += ("target_volumems",)
+        props += ("target_volumes",)
         data += (diagram.target_volumes,)
 
     for p, d in zip(props, data):
@@ -1028,25 +1039,25 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
             gradient = "large_at_middle" if name == ExampleDataName.MIDDLE else name
             data = paper.create_example4b_data(gradient=gradient, is_periodic=False)
 
-        case ExampleDataName.DP:
+        case ExampleDataName.DUAL_PHASE:
             data = paper.create_example5p4_data(is_periodic=False)
 
         case ExampleDataName.LOGNORMAL:
             data = paper.create_example5p5_data(is_periodic=False)
 
-        case ExampleDataName.EBSD:
-            ebsd_df = {}
-            for d in ("dimension", "seeds", "volumes"):
+        case ExampleDataName.EBSD | ExampleDataName.BANDED_PERIODIC:
+            register = {}
+            for file in ("dimension", "seeds", "volumes"):
                 df = pd.read_csv(
-                    pathlib.Path().resolve() / "assets" / "data" / f"ebsd_{d}.csv",
+                    pathlib.Path().resolve() / "assets" / "data" / name / f"{file}.csv",
                     index_col=False,
                 )
-                ebsd_df[d] = df
+                register[file] = df
 
             data = SynthetMicData(
-                seeds=ebsd_df["seeds"].values,
-                volumes=ebsd_df["volumes"]["volumes"].values,
-                domain=np.array([[0, i] for i in ebsd_df["dimension"].values[0]]),
+                seeds=register["seeds"].values,
+                volumes=register["volumes"]["volumes"].values,
+                domain=np.array([[0, i] for i in register["dimension"].values[0]]),
                 periodic=None,
                 init_weights=None,
             )

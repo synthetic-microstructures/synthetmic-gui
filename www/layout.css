@@ -1,8 +1,3 @@
 .navbar-nav {
     justify-content: center !important;
 }
-
-.modal-dialog {
-    margin-top: 20px !important;
-    overflow-y: hidden !important;
-}

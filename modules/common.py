@@ -2,7 +2,6 @@ import tempfile
 from datetime import datetime
 
 import faicons
-from bs4 import BeautifulSoup
 from matplotlib import colormaps
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 from synthetmic.data.utils import SynthetMicData
@@ -69,6 +68,7 @@ def server(
                     slice_value=input.slice_value(),
                     colormap=input.colormap(),
                     opacity=input.opacity(),
+                    add_final_seed_positions=input.add_final_seed_positions(),
                 )
 
             case DiagramView.CLIP:
@@ -100,6 +100,7 @@ def server(
                         clip_value=input.clip_value(),
                         invert=input.invert(),
                         add_remains_as_wireframe=input.add_remains_as_wireframe(),
+                        add_final_seed_positions=input.add_final_seed_positions(),
                         colormap=input.colormap(),
                         opacity=input.opacity(),
                     )
@@ -140,6 +141,9 @@ def server(
         ui.update_select(id="colorby", selected=input.colorby())
         ui.update_select(id="colormap", selected=input.colormap())
         ui.update_slider(id="opacity", value=input.opacity())
+        ui.update_switch(
+            id="add_final_seed_positions", value=input.add_final_seed_positions()
+        )
 
     @reactive.effect
     @reactive.event(input.reset_plot_options)
@@ -148,6 +152,10 @@ def server(
         ui.update_select(id="colorby", selected=PLOT_DEFAULTS["colorby"])
         ui.update_select(id="colormap", selected=PLOT_DEFAULTS["colormap"])
         ui.update_slider(id="opacity", value=PLOT_DEFAULTS["opacity"])
+        ui.update_switch(
+            id="add_final_seed_positions",
+            value=PLOT_DEFAULTS["add_final_seed_positions"],
+        )
 
     @render.ui
     def common_opts() -> ui.Tag:
@@ -159,23 +167,23 @@ def server(
         return ui.card(
             ui.card_header("Common plot options"),
             ui.tags.div(
-                comps.create_selection(
+                comps.selection(
                     id="view",
                     label="Choose a diagram to view",
                     choices=view_choices,
                     selected=DiagramView.FULL,
                     width="100%",
                 ),
-                comps.create_selection(
+                comps.selection(
                     id="colorby",
                     label="Color by",
                     choices=[c for c in Colorby],
                     selected=PLOT_DEFAULTS["colorby"],
                     width="100%",
                 ),
-                comps.create_selection(
+                comps.selection(
                     id="colormap",
-                    label="Choose a colormap",
+                    label="Choose or search a colormap",
                     choices=sorted(list(colormaps)),
                     selected=PLOT_DEFAULTS["colormap"],
                     width="100%",
@@ -189,7 +197,12 @@ def server(
                     ticks=True,
                     width="100%",
                 ),
-                comps.create_input_action_button(
+                ui.input_switch(
+                    id="add_final_seed_positions",
+                    label="Add final seed positions",
+                    width="100%",
+                ),
+                comps.input_action_button(
                     id="reset_plot_options",
                     label="Reset common plot options to defaults",
                     icon="gear",
@@ -251,17 +264,11 @@ def server(
         opts = ()
         match input.view():
             case DiagramView.FULL:
-                opts += (
-                    ui.input_switch(
-                        id="add_final_seed_positions",
-                        label="Add final seed positions",
-                        width="100%",
-                    ),
-                )
+                return
 
             case DiagramView.SLICE:
                 opts += (
-                    comps.create_selection(
+                    comps.selection(
                         id="slice_normal",
                         label="Choose a normal for slicing",
                         choices=list(utils.COORDINATES[: len(data.domain)]),
@@ -272,7 +279,7 @@ def server(
                 )
             case DiagramView.CLIP:
                 opts += (
-                    comps.create_selection(
+                    comps.selection(
                         id="clip_normal",
                         label="Choose a normal for clipping",
                         choices=list(utils.COORDINATES[: len(data.domain)]),
@@ -305,22 +312,19 @@ def server(
     @render.ui
     def metrics_tab_card() -> ui.Tag | None:
         if input.view() == DiagramView.CLIP:
-            return ui.card(
-                ui.card_header(
-                    faicons.icon_svg("circle-exclamation", fill=FILL_COLOUR),
-                    "A note on metrics",
-                ),
+            return ui.help_text(
                 ui.markdown(
                     """
-                    Metrics are not available for clip view. You can only view the clipped microstructure
-                    by selecting the **Microstructure** tab.
+                    Metrics are not available for clip view. You can
+                    only view the clipped microstructure
+                    by selecting the **Microstructure** button.
                     """
                 ),
             )
 
         metrics = _calculate_metrics()
         if isinstance(metrics, Exception):
-            comps.create_error_notification(str(metrics))
+            comps.error_notification(str(metrics))
             return
 
         @render.plot
@@ -354,7 +358,7 @@ def server(
                     """
                 )
             ),
-            comps.create_download_button(
+            comps.download_button(
                 id="download_metrics",
                 label="Yes, download the current metrics",
             ),
@@ -419,7 +423,7 @@ def server(
     def diagram_tab_card() -> ui.Tag | None:
         diagram = _calculate_diagram()
         if isinstance(diagram, Exception):
-            comps.create_error_notification(str(diagram))
+            comps.error_notification(str(diagram))
             return
 
         @render.ui
@@ -429,9 +433,9 @@ def server(
                 f.seek(0)
                 html = f.read().decode("utf-8")
 
-            soup = BeautifulSoup(html, "html.parser")
-            html = str(soup.body)
-            return ui.HTML(html)
+            return ui.tags.iframe(
+                srcdoc=html, style="width:100%; height:100%; border:none;"
+            )
 
         @render.download(
             filename=lambda: f"synthetmic-gui-output-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.zip",
@@ -456,7 +460,7 @@ def server(
                     "All outputs will be downloaded in .zip format which can be easily unzipped for futher processing."
                 )
             ),
-            comps.create_download_button(
+            comps.download_button(
                 id="download_diagram",
                 label="Yes, download the current diagram and properties",
             ),
