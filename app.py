@@ -28,9 +28,6 @@ app_ui = ui.page_fillable(
         title=APP_NAME,
         navbar_options=ui.navbar_options(underline=True),
     ),
-    ui.head_content(
-        ui.tags.link(rel="icon", type="image/png", href="favicon.ico"),
-    ),
     title=APP_NAME,
 )
 
