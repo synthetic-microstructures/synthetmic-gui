@@ -20,6 +20,8 @@ MS_LINK: str = "https://www.gla.ac.uk/schools/mathematicsstatistics/"
 HW_LINK: str = "https://www.hw.ac.uk/"
 UOG_LINK: str = "https://www.gla.ac.uk/"
 
+ALGO_PAPER_LINK: str = "https://doi.org/10.1080/14786435.2020.1790053"
+
 FILL_COLOUR: str = "#0073CF"
 
 
@@ -29,16 +31,17 @@ class DiagramType(StrEnum):
 
 
 class ExampleDataName(StrEnum):
-    LOGNORMAL = auto()
-    EBSD = auto()
-    DP = auto()
-    BANDED = auto()
-    CLUSTERED = auto()
-    MIXED = auto()
-    RANDOM = auto()
-    INCREASING = auto()
-    MIDDLE = auto()
-    BASIC = auto()
+    EBSD = "EBSD"
+    LOGNORMAL = "Lognormal"
+    BANDED_PERIODIC = "Banded periodic"
+    DUAL_PHASE = "Dual phase"
+    BASIC = "Basic"
+    RANDOM = "Random"
+    BANDED = "Banded"
+    MIXED = "Mixed"
+    CLUSTERED = "Clustered"
+    INCREASING = "Increasing"
+    MIDDLE = "Middle"
 
 
 class Colorby(StrEnum):

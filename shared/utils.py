@@ -683,7 +683,7 @@ def extract_property_as_df(diagram: Diagram) -> dict[str, pd.DataFrame]:
     data = (diagram.weights, diagram.fitted_volumes)
 
     if diagram.target_volumes is not None:
-        props += ("target_volumems",)
+        props += ("target_volumes",)
         data += (diagram.target_volumes,)
 
     for p, d in zip(props, data):
@@ -1039,25 +1039,25 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
             gradient = "large_at_middle" if name == ExampleDataName.MIDDLE else name
             data = paper.create_example4b_data(gradient=gradient, is_periodic=False)
 
-        case ExampleDataName.DP:
+        case ExampleDataName.DUAL_PHASE:
             data = paper.create_example5p4_data(is_periodic=False)
 
         case ExampleDataName.LOGNORMAL:
             data = paper.create_example5p5_data(is_periodic=False)
 
-        case ExampleDataName.EBSD:
-            ebsd_df = {}
-            for d in ("dimension", "seeds", "volumes"):
+        case ExampleDataName.EBSD | ExampleDataName.BANDED_PERIODIC:
+            register = {}
+            for file in ("dimension", "seeds", "volumes"):
                 df = pd.read_csv(
-                    pathlib.Path().resolve() / "assets" / "data" / f"ebsd_{d}.csv",
+                    pathlib.Path().resolve() / "assets" / "data" / name / f"{file}.csv",
                     index_col=False,
                 )
-                ebsd_df[d] = df
+                register[file] = df
 
             data = SynthetMicData(
-                seeds=ebsd_df["seeds"].values,
-                volumes=ebsd_df["volumes"]["volumes"].values,
-                domain=np.array([[0, i] for i in ebsd_df["dimension"].values[0]]),
+                seeds=register["seeds"].values,
+                volumes=register["volumes"]["volumes"].values,
+                domain=np.array([[0, i] for i in register["dimension"].values[0]]),
                 periodic=None,
                 init_weights=None,
             )

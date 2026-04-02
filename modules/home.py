@@ -6,6 +6,7 @@ from shiny.types import ImgData
 
 from shared import comps, utils, views
 from shared.consts import (
+    ALGO_PAPER_LINK,
     APP_AUTHORS,
     APP_LINK,
     APP_NAME,
@@ -114,7 +115,7 @@ def about_text() -> ui.TagList:
         **{APP_NAME}** is a web app for generating 2D and 3D synthetic
         polycrystalline microstructures using Voronoi and Laguerre tessellations.
         It uses the fast algorithms (developed in this
-        {comps.anchor_html("paper", "https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053")})
+        {comps.anchor_html("paper", ALGO_PAPER_LINK)})
         for generating grains of prescribed volumes using optimal transport theory.
         It is built on top of the {comps.anchor_html("SynthetMic", "https://github.com/synthetic-microstructures/synthetmic")}
         and {comps.anchor_html("pysdot", "https://github.com/sd-ot/pysdot")} packages.
@@ -134,12 +135,10 @@ def usage_text() -> ui.TagList:
         choose whether the underlying domain is periodic in a given coordinate.
         1. Specify the number of grains and how the target volumes will be generated.
         We support single- and dual-phase microstructures. You
-        can also upload your custom target volumes instead. Note that if
-        the Voronoi diagram option is chosen, there is no need to specify
-        target volumes.
+        can also upload your custom target volumes instead.
         1. Click on the **Generate microstructure** button.
-        1. Click on the **download buttons** to either download
-        the generated diagram or the diagram properties
+        1. Click on the **download buttons** to download
+        the generated diagram and the diagram properties
         (like centroids, vertices, etc.).
 
         That is it! Enjoy generating microstructures!"""
@@ -176,102 +175,132 @@ def create_example_data_card(
         colorby=fitted volumes, colormap=plasma.
         """
 
-    match name:
-        case ExampleDataName.BASIC:
-            info = """
+    register = {
+        ExampleDataName.BASIC: dict(
+            info=f"""
                 This is an example of a basic synthetic microstructure with a 
                 random seed initialization and constant volume distribution.
-                """
-            tags = "Laguerre, 2D, random seed, constant volumes, "
-
-        case ExampleDataName.RANDOM:
-            info = """
+                For more information, see Figure 2 of this
+                {comps.anchor_html("paper", ALGO_PAPER_LINK)}.
+                """,
+            tags="Laguerre, 2D, random seed, constant volumes, ",
+        ),
+        ExampleDataName.RANDOM: dict(
+            info=f"""
                 Random distribution of initial seed locations. Here the initial
                 generator locations of the large and small grains are uniformly
-                distributed over the corresponding domain.
-                """
-            tags = "Laguerre, 2D, dual-phase volumes, random seeds, "
-
-        case ExampleDataName.BANDED:
-            info = """
+                distributed over the corresponding domain. For more information, see
+                Figure 4 of this {comps.anchor_html("paper", ALGO_PAPER_LINK)}.
+                """,
+            tags="Laguerre, 2D, dual-phase volumes, random seeds, ",
+        ),
+        ExampleDataName.BANDED: dict(
+            info=f"""
                 Banded distribution of initial seed locations.
                 Here, the different sized grains have initial generator
                 locations that lie inside bands within the domain.
                 The sizes of the bands have been chosen so that there are
                 approximately equal numbers of small grains within each
                 small-grain band and approximately equal numbers of large grains
-                within each large-grain band.
-                """
-            tags = "Laguerre, 2D, dual-phase volumes, banded seeds, "
-
-        case ExampleDataName.CLUSTERED:
-            info = """
+                within each large-grain band. For more information, see
+                Figure 4 of this {comps.anchor_html("paper", ALGO_PAPER_LINK)}.
+                """,
+            tags="Laguerre, 2D, dual-phase volumes, banded seeds, ",
+        ),
+        ExampleDataName.CLUSTERED: dict(
+            info=f"""
                 Clustered distribution of initial seed locations. 
                 Here, the smaller grains have initial generator locations
-                that lie inside non-overlapping discs.
-                """
-            tags = "Laguerre, 2D, dual-phase volumes, clustered seeds, "
-
-        case ExampleDataName.MIXED:
-            info = """
+                that lie inside non-overlapping discs. For more information, see
+                Figure 4 of this {comps.anchor_html("paper", ALGO_PAPER_LINK)}.
+                """,
+            tags="Laguerre, 2D, dual-phase volumes, clustered seeds, ",
+        ),
+        ExampleDataName.MIXED: dict(
+            info=f"""
                 A mixed distribution: the initial generators are
                 such that the larger grains are arranged in bands and
                 the smaller grains are a combination of the banded and random distributions.
-                """
-            tags = "Laguerre, 2D, dual-phase volumes, mixed seeds, "
-
-        case ExampleDataName.INCREASING:
-            info = """
+                For more information, see Figure 4 of this
+                {comps.anchor_html("paper", ALGO_PAPER_LINK)}.
+                """,
+            tags="Laguerre, 2D, dual-phase volumes, mixed seeds, ",
+        ),
+        ExampleDataName.INCREASING: dict(
+            info=f"""
                 The initial seed locations are distributed such that the 𝑥-coordinate
-                increases with grain size.
-                """
-            tags = "Laguerre, 2D, multi-phase volumes, increasing grain size, "
-
-        case ExampleDataName.MIDDLE:
-            info = """
+                increases with grain size. For more information, see Figure 5 of this
+                {comps.anchor_html("paper", ALGO_PAPER_LINK)}.
+                """,
+            tags="Laguerre, 2D, multi-phase volumes, increasing grain size, ",
+        ),
+        ExampleDataName.MIDDLE: dict(
+            info=f"""
                 The initial seed locations are distributed such that
                 the larger grains are found in the middle of the domain.
-                """
-            tags = "Laguerre, 2D, multi-phase volumes, divergent grain size, "
-
-        case ExampleDataName.DP:
-            info = """
+                For more information, see Figure 5 of this
+                {comps.anchor_html("paper", ALGO_PAPER_LINK)}.
+                """,
+            tags="Laguerre, 2D, multi-phase volumes, divergent grain size, ",
+        ),
+        ExampleDataName.DUAL_PHASE: dict(
+            info=f"""
                 An RVE of a dual-phase material with a banded microstructure.
-                """
-            tags = "Laguerre, 3D, RVE, dual-phase, banded structure, "
-
-        case ExampleDataName.LOGNORMAL:
-            info = """
+                For more information, see Figure 5.4 of this
+                {comps.anchor_html("paper", ALGO_PAPER_LINK)}.
+                """,
+            tags="Laguerre, 3D, RVE, dual-phase, banded structure, ",
+        ),
+        ExampleDataName.LOGNORMAL: dict(
+            info=f"""
                 An RVE in which the grain volumes have an approximately lognormal distribution.
                 The coefficient of variation of the volumes (the ratio of the standard
                 deviation to the mean) is 1.4.
-
                 For more information, see Example 5.5 of this
-                [paper](https://www.tandfonline.com/doi/full/10.1080/14786435.2020.1790053#d1e7431).
-                """
-            tags = "Laguerre, 3D, RVE, lognormal volumes, banded structure, "
-
-        case ExampleDataName.EBSD:
-            info = """
+                {comps.anchor_html("paper", ALGO_PAPER_LINK)}
+                and this {
+                comps.anchor_html(
+                    "notebook",
+                    "https://github.com/synthetic-microstructures/synthetmic/blob/main/examples/notebooks/laguerre/Lognormal_microstructure.ipynb",
+                )
+            }.
+                """,
+            tags="Laguerre, 3D, RVE, lognormal volumes, ",
+        ),
+        ExampleDataName.EBSD: dict(
+            info=f"""
             In this example we fit a Laguerre diagram to an EBSD image of a
             single-phase steel. The 'target volumes'
             are the areas of the grains in the EBSD image. The 'seeds' are the
             centroids of the grains in the EBSD image. The EBSD data is taken
-            from this [paper](https://doi.org/10.1051/m2an/2025004).
-            """
-            tags = "Laguerre, 2D, non-periodic, volume upload, seed upload, volume tolerance = 1, Lloyd iterations = 0, damp param = 1"
-
-        case _:
-            raise ValueError(
-                f"Invalid data name '{name}'; name must be one of [{', '.join(ExampleDataName)}]."
-            )
+            from this {comps.anchor_html("paper", "https://doi.org/10.1051/m2an/2025004")}.
+            """,
+            tags="Laguerre, 2D, non-periodic, volume upload, seed upload, volume tolerance = 1, Lloyd iterations = 0, damp param = 1",
+        ),
+        ExampleDataName.BANDED_PERIODIC: dict(
+            info=f"""
+            This is an example of a banded periodic microstructure. The diagram is
+            periodic in one direction, the volumes within each band are drawn from a
+            log-normal distribution. There are 8000 grains in the central band and
+            1000 grains in each of the other bands. For more information,
+            see this {
+                comps.anchor_html(
+                    "notebook",
+                    "https://github.com/synthetic-microstructures/synthetmic/blob/main/examples/notebooks/laguerre/Banded_periodic.ipynb",
+                )
+            }.
+            """,
+            tags="""3D, Laguerre, x-periodic, seed upload, volume upload, banded
+            structure, lognormal, """,
+        ),
+    }
 
     return ui.card(
         ui.card_header(f"Selected example: {name}"),
         ui.output_image(image_id, fill=True, height="100%", width="100%"),
-        ui.markdown(info),
+        ui.markdown(register[name]["info"]),
         ui.help_text(
-            f"Tags: {tags}{'' if name == ExampleDataName.EBSD else common_tags}"
+            f"Tags: {register[name]['tags']}{'' if name == ExampleDataName.EBSD else common_tags}"
         ),
     )
 
