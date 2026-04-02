@@ -1049,7 +1049,7 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
             register = {}
             for file in ("dimension", "seeds", "volumes"):
                 df = pd.read_csv(
-                    pathlib.Path().resolve() / "assets" / "data" / name / f"{file}.csv",
+                    pathlib.Path().resolve() / "assets" / "csvs" / name / f"{file}.csv",
                     index_col=False,
                 )
                 register[file] = df

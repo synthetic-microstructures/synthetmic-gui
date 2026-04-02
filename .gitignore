@@ -7,6 +7,5 @@ wheels/
 .pytest_cache/
 .env
 .venv/
-data/
 rsconnect-python/
 notebooks/
