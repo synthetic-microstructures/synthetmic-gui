@@ -58,5 +58,5 @@ The following instructions use uv for setting up the app locally.
 ### Citation
 If you use this app in any publication or report, please cite it as follows:
 
-> R.O. Ibraheem, D.P. Bourne and S.M. Roper (2025). SynthetMic-GUI (<insert the version here>)
+> R.O. Ibraheem, D.P. Bourne and S.M. Roper (2025). SynthetMic-GUI (v0.4.0)
 > [Software]. Avaialable from https://david-bourne.shinyapps.io/synthetmic-gui/.
