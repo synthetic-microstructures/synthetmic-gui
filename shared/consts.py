@@ -106,7 +106,7 @@ PLOT_DEFAULTS: MappingProxyType = MappingProxyType(
     {
         "view": DiagramView.FULL,
         "colorby": Colorby.FITTED_VOLUMES,
-        "colormap": "plasma",
+        "colormap": "tab20",
         "opacity": 1.0,
         "slice_value": 0.0,
         "slice_normal": "x",

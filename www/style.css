@@ -3,3 +3,7 @@
 * {
     font-family: 'Atkinson Hyperlegible', sans-serif;
 }
+
+:root {
+    --bslib-sidebar-main-bg: #f8f8f8;
+}
