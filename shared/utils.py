@@ -1029,14 +1029,18 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
             | ExampleDataName.MIXED
         ):
             initializer = (
-                "mixed_banded_and_random" if name == ExampleDataName.MIXED else name
+                "mixed_banded_and_random"
+                if name == ExampleDataName.MIXED
+                else name.lower()
             )
             data = paper.create_example4_data(
                 initializer=initializer, is_periodic=False
             )
 
         case ExampleDataName.INCREASING | ExampleDataName.MIDDLE:
-            gradient = "large_at_middle" if name == ExampleDataName.MIDDLE else name
+            gradient = (
+                "large_at_middle" if name == ExampleDataName.MIDDLE else name.lower()
+            )
             data = paper.create_example4b_data(gradient=gradient, is_periodic=False)
 
         case ExampleDataName.DUAL_PHASE:
