@@ -2162,6 +2162,21 @@ wheels = [
 ]
 
 [[package]]
+name = "shinyswatch"
+version = "0.10.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "htmltools" },
+    { name = "packaging" },
+    { name = "shiny" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0f/02/09f4f3aa08bf8cb65505df2b890352ca4e8d1ec40006acafdd5c580041df/shinyswatch-0.10.0.tar.gz", hash = "sha256:8a5320b39210f1d17209c1b850af3ffde8eff17f14f80cb59e618e31c730d59d", size = 1342646, upload-time = "2026-03-20T20:49:04.136Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2d/aa/ee71cc77cc9a3c3cf33096d65ab9cd3824536e3749eeffc9d08939da1032/shinyswatch-0.10.0-py3-none-any.whl", hash = "sha256:5164f3677a2e15794349fc90e6e3bf5d33b753d4cf21a44cff6510d8e8b06d83", size = 1357657, upload-time = "2026-03-20T20:49:02.543Z" },
+]
+
+[[package]]
 name = "shinywidgets"
 version = "0.6.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2271,6 +2286,7 @@ dependencies = [
     { name = "seaborn" },
     { name = "shiny" },
     { name = "shiny-validate" },
+    { name = "shinyswatch" },
     { name = "shinywidgets" },
     { name = "synthetmic" },
     { name = "trame-vtk" },
@@ -2295,6 +2311,7 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shiny", specifier = "==1.5.1" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
+    { name = "shinyswatch", specifier = ">=0.10.0" },
     { name = "shinywidgets", specifier = ">=0.6.2" },
     { name = "synthetmic", specifier = "==0.2.2" },
     { name = "tbx", marker = "extra == 'deploy'", git = "https://github.com/Rasheed19/tbx.git" },
