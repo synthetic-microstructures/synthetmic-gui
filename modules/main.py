@@ -5,8 +5,7 @@ import pandas as pd
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 from shiny.types import FileInfo
 from shiny_validate import InputValidator
-from synthetmic.data.utils import SynthetMicData, sample_random_seeds
-from synthetmic.generate import DiagramGenerator
+from synthetmic.data.utils import sample_random_seeds
 
 from modules import common, laguerre, voronoi
 from shared import comps, utils, views
@@ -124,7 +123,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
 
     @reactive.calc
     @reactive.event(input.generate)
-    def _fit() -> tuple[SynthetMicData, DiagramGenerator] | Exception:
+    def _fit() -> utils.ProcessedData | Exception:
         if input.dim() == Dimension.THREE_D:
             iv.add_rule("height", utils.req_gt(rhs=0))
 
@@ -150,16 +149,17 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         )
 
         if input.diagram() == DiagramType.LAGUERRE:
-            volumes = laguerre.volumes(
+            out = laguerre.volumes(
                 input=input,
                 iv=iv,
                 domain_vol=np.prod(box_dim),
                 space_dim=space_dim,
                 uploaded_volumes=_uploaded_volumes(),
             )
-            if isinstance(volumes, Exception):
-                return volumes
+            if isinstance(out, Exception):
+                return out
 
+            volumes, phases = out
             n_grains = len(volumes)
             tol = input.tol()
 
@@ -169,9 +169,10 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             if not iv.is_valid():
                 return Exception(views.invalid_input_text())
 
-            volumes = None
-            tol = None
             n_grains = input.n_grains()
+            volumes = None
+            phases = np.zeros(n_grains)
+            tol = None
 
         if input.seeds_init() == SeedInitializer.RANDOM:
             iv.add_rule("random_state", utils.int_gte(rhs=0, allow_none=True))
@@ -193,18 +194,18 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             if seeds is None:
                 return Exception("Seeds not uploaded. Upload seeds and try again.")
 
-            val_out = utils.validate_df(
+            coords = list(utils.COORDINATES)[:space_dim]
+            res = utils.validate_upload(
                 seeds,
-                expected_colnames=list(utils.COORDINATES)[:space_dim],
+                expected_colnames=coords,
                 expected_dim=(n_grains, space_dim),
-                expected_type="float",
                 file="seeds",
-                bounds=dict(zip(utils.COORDINATES[:space_dim], domain)),
+                bounds=dict(zip(coords, domain)),
             )
-            if isinstance(val_out, str):
-                return Exception(val_out)
+            if isinstance(res, Exception):
+                return res
 
-            seeds = seeds.values
+            seeds = seeds[coords].values
 
         # In case of Laguerre, check if len of volumes and seeds match
         if input.diagram() == DiagramType.LAGUERRE:
@@ -214,7 +215,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                   len(seeds)={len(seeds)}, len(volumes)={len(volumes)}"""
                 )
 
-        return utils.fit(
+        sm_data, generator = utils.fit(
             domain=domain,
             seeds=seeds,
             volumes=volumes,
@@ -223,6 +224,8 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             n_iter=input.n_iter(),
             damp_param=input.damp_param(),
         )
+
+        return utils.ProcessedData(sm_data=sm_data, generator=generator, phases=phases)
 
     @reactive.effect
     @reactive.event(input.generate)

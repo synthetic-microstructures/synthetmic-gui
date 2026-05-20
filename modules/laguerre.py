@@ -158,7 +158,7 @@ def volumes(
     domain_vol: float,
     space_dim: int,
     uploaded_volumes: pd.DataFrame | None,
-) -> np.ndarray | Exception:
+) -> tuple[np.ndarray, np.ndarray] | Exception:
     iv.add_rule("tol", utils.req_gt(rhs=0))
 
     match input.phase():
@@ -184,15 +184,13 @@ def volumes(
             if not iv.is_valid():
                 return Exception(views.invalid_input_text())
 
-            volumes = utils.sample_single_phase_vols(
+            return utils.sample_single_phase_vols(
                 dist=input.single_phase_dist(),
                 n_grains=input.single_phase_n_grains(),
                 domain_vol=domain_vol,
                 space_dim=space_dim,
                 **kwargs,
             )
-
-            return volumes
 
         case Phase.DUAL:
             for n in (1, 2):
@@ -232,7 +230,7 @@ def volumes(
             if not iv.is_valid():
                 return Exception(views.invalid_input_text())
 
-            volumes = utils.sample_dual_phase_vols(
+            return utils.sample_dual_phase_vols(
                 dist=(input.phase1_dist(), input.phase2_dist()),
                 n_grains=(input.phase1_n_grains(), input.phase2_n_grains()),
                 vol_ratio=(input.phase1_vol_ratio(), input.phase2_vol_ratio()),
@@ -240,8 +238,6 @@ def volumes(
                 space_dim=space_dim,
                 dist_kwargs=(phase1_kwargs, phase2_kwargs),
             )
-
-            return volumes
 
         case Phase.UPLOAD:
             iv.enable()
@@ -253,16 +249,15 @@ def volumes(
                     "Grain volumes not uploaded. Upload grain volumes and try again."
                 )
 
-            val_out = utils.validate_df(
+            val_out = utils.validate_upload(
                 uploaded_volumes,
                 expected_colnames=[utils.VOLUMES],
                 expected_dim=None,
-                expected_type="float",
                 file="volumes",
                 bounds=None,
             )
-            if isinstance(val_out, str):
-                return Exception(val_out)
+            if isinstance(val_out, Exception):
+                return val_out
 
             VOL_DIFF_TOL = 1e-6
             volumes = uploaded_volumes[utils.VOLUMES].values
@@ -273,7 +268,13 @@ def volumes(
                     a difference of {diff}. Volume difference must be at most {VOL_DIFF_TOL:.2e}.
                     """)
 
-            return volumes
+            if utils.PHASES in uploaded_volumes.columns:
+                phases = uploaded_volumes[utils.PHASES].values
+
+            else:
+                phases = np.zeros_like(volumes)
+
+            return volumes, phases
 
         case _:
             return Exception(

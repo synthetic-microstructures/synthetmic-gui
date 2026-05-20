@@ -2311,7 +2311,7 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shiny", specifier = "==1.5.1" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
-    { name = "shinyswatch", specifier = ">=0.10.0" },
+    { name = "shinyswatch", specifier = "==0.10.0" },
     { name = "shinywidgets", specifier = ">=0.6.2" },
     { name = "synthetmic", specifier = "==0.2.2" },
     { name = "tbx", marker = "extra == 'deploy'", git = "https://github.com/Rasheed19/tbx.git" },

@@ -34,9 +34,10 @@ from shared.consts import (
 
 COORDINATES: tuple[str, str, str] = ("x", "y", "z")
 VOLUMES: str = "volumes"
+PHASES: str = "phases"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Diagram:
     centroids: np.ndarray
     vertices: dict[int, list]
@@ -48,10 +49,9 @@ class Diagram:
     domain: np.ndarray
     mesh: pv.PolyData | pv.UnstructuredGrid
     plotter: pv.Plotter
-    clips: tuple[pv.UnstructuredGrid, pv.UnstructuredGrid] | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Metrics:
     space_dim: int
     fig: Figure
@@ -66,25 +66,32 @@ class Metrics:
     max_percentage_error: float | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Event:
     name: str
     category: str
     label: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Box:
     length: float
     breadth: float
     height: float | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Periodic:
     is_x_periodic: bool
     is_y_periodic: bool
     is_z_periodic: bool | None
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessedData:
+    sm_data: SynthetMicData
+    generator: DiagramGenerator
+    phases: np.ndarray
 
 
 def parse_box_dim(box: Box, dim: str) -> tuple[float, ...]:
@@ -109,11 +116,12 @@ def sample_single_phase_vols(
     domain_vol: float,
     space_dim: int,
     **kwargs,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
+    phases = np.zeros(n_grains)
     match dist:
         case Distribution.CONSTANT:
             rel_vol = np.ones(n_grains) / n_grains
-            return rel_vol * domain_vol
+            return rel_vol * domain_vol, phases
 
         case Distribution.UNIFORM:
             if not {"low", "high"}.issubset(kwargs):
@@ -126,7 +134,7 @@ def sample_single_phase_vols(
             )
             scaling_factor = domain_vol / samples.sum()
 
-            return scaling_factor * samples
+            return scaling_factor * samples, phases
 
         case Distribution.LOGNORMAL:
             if not {"mean", "std"}.issubset(kwargs):
@@ -142,7 +150,7 @@ def sample_single_phase_vols(
 
             scaling_factor = domain_vol / samples.sum()
 
-            return scaling_factor * samples
+            return scaling_factor * samples, phases
 
         case _:
             raise ValueError(
@@ -157,13 +165,13 @@ def sample_dual_phase_vols(
     domain_vol: float,
     space_dim: int,
     dist_kwargs: tuple[dict[str, float], dict[str, float]],
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     phase1_vol = (vol_ratio[0] / sum(vol_ratio)) * domain_vol
     phase2_vol = domain_vol - phase1_vol
 
     domain_vols = (phase1_vol, phase2_vol)
 
-    return np.concatenate(
+    volumes = np.concatenate(
         tuple(
             [
                 sample_single_phase_vols(
@@ -172,18 +180,23 @@ def sample_dual_phase_vols(
                     domain_vol=domain_vols[i],
                     space_dim=space_dim,
                     **dist_kwargs[i],
-                )
-                for i in (0, 1)
+                )[0]
+                for i in range(2)
             ]
         ),
         axis=None,
     )
 
+    phases = np.concatenate([np.zeros(n_grains[0]), np.ones(n_grains[1])])
 
-def prepare_mesh(
+    return volumes, phases
+
+
+def process_mesh(
     mesh: pv.PolyData | pv.UnstructuredGrid,
     target_volumes: np.ndarray | None,
     fitted_volumes: np.ndarray,
+    phases: np.ndarray,
     colorby: str,
 ) -> tuple[pv.PolyData | pv.UnstructuredGrid, tuple[float, float]]:
     if colorby not in Colorby:
@@ -204,6 +217,7 @@ def prepare_mesh(
         Colorby.FITTED_VOLUMES: fitted_volumes,
         Colorby.VOLUME_ERRORS: errors,
         Colorby.RANDOM: np.random.rand(fitted_volumes.shape[0]),
+        Colorby.PHASES: phases,
     }
 
     mesh.cell_data["vols"] = register[colorby][mesh.cell_data["num"].astype(int)]
@@ -228,281 +242,302 @@ def add_points(plotter: pv.Plotter, points: np.ndarray) -> None:
     return None
 
 
-def generate_clip_diagram(
-    data: SynthetMicData,
-    generator: DiagramGenerator,
-    colorby: str,
-    clip_normal: str,
-    clip_value: float,
-    invert: bool,
-    add_remains_as_wireframe: bool,
-    add_final_seed_positions: bool = False,
-    colormap: str = "plasma",
-    window_size: tuple[int, int] = (400, 400),
-    opacity: float = 1.0,
-) -> Diagram:
-    if clip_normal not in COORDINATES:
-        raise ValueError(
-            f"Invalid for clip_normal: {clip_normal}. Value must be one of {COORDINATES}."
+class DiagramViewer:
+    def __init__(
+        self,
+        processed_data: ProcessedData,
+        colorby: str,
+        colormap: str = "plasma",
+        window_size: tuple[int, int] = (400, 400),
+        opacity: float = 1.0,
+        add_final_seed_positions: bool = False,
+    ) -> None:
+        self.processed_data = processed_data
+        self.colorby = colorby
+        self.colormap = colormap
+        self.window_size = window_size
+        self.opacity = opacity
+        self.add_final_seed_positions = add_final_seed_positions
+
+        self._scalars = "vols"
+        self._mesh = processed_data.generator.get_mesh()
+        self._volumes = processed_data.sm_data.volumes
+        self._fitted_volumes = processed_data.generator.get_fitted_volumes()
+        self._phases = self.processed_data.phases
+        self._centroids = processed_data.generator.get_centroids()
+        self._positions = processed_data.generator.get_positions()
+        self._vertices = processed_data.generator.get_vertices()
+        self._weights = processed_data.generator.get_weights()
+        self._seeds = processed_data.sm_data.seeds
+        self._domain = processed_data.sm_data.domain
+        self._periodic = processed_data.sm_data.periodic
+
+        self._processed_mesh, self._clim = process_mesh(
+            mesh=self._mesh,
+            target_volumes=self._volumes,
+            fitted_volumes=self._fitted_volumes,
+            phases=self._phases,
+            colorby=self.colorby,
         )
 
-    domain_map = dict(zip(COORDINATES, data.domain))
-    a, b = domain_map[clip_normal]
-    if not (a < clip_value < b):
-        raise ValueError(
-            f"clip_center: {clip_value} is out of domain along the specified normal. Value must be in ({a}, {b})."
-        )
+    def _plotter(self) -> pv.Plotter:
+        return pv.Plotter(off_screen=True, window_size=list(self.window_size))
 
-    fitted_volumes = generator.get_fitted_volumes()
-    mesh, clim = prepare_mesh(
-        mesh=generator.get_mesh(),
-        target_volumes=data.volumes,
-        fitted_volumes=fitted_volumes,
-        colorby=colorby,
-    )
-    clips = mesh.clip(
-        normal=clip_normal,
-        origin=(
-            0,
-            0,
-            0,
-        ),  # ensure that origin is taken as (0,0, 0) as all domain originates from 0.
-        value=clip_value,
-        return_clipped=True,
-        crinkle=True,
-        invert=not invert,  # note: invert is negated to have a more intuitive behaviour;
+    def _set_positions_and_camera(
+        self, plotter: pv.Plotter, is_slice: bool = False
+    ) -> None:
+        if self.add_final_seed_positions:
+            add_points(plotter=plotter, points=self._positions)
+
+        if len(self._domain) == 2 or is_slice:
+            plotter.camera_position = "xy"
+
+        return None
+
+    def clip(
+        self,
+        clip_normal: str,
+        clip_value: float,
+        invert: bool,
+        add_remains_as_wireframe: bool,
+    ) -> Diagram:
+
+        if clip_normal not in COORDINATES:
+            raise ValueError(
+                f"Invalid for clip_normal: {clip_normal}. Value must be one of {COORDINATES}."
+            )
+
+        domain_map = dict(zip(COORDINATES, self._domain))
+        a, b = domain_map[clip_normal]
+        if not (a < clip_value < b):
+            raise ValueError(
+                f"clip_center: {clip_value} is out of domain along the specified normal. Value must be in ({a}, {b})."
+            )
+
+        # Ensure that origin is taken as (0,0, 0) as all domain originates from 0.
+        # Note: invert is negated to have a more intuitive behaviour;
         # so if clip_value is 0.1 and invert is false, the bits up to 0.1 will
         # be stored as the first element in the returned tuple.
-    )
+        clips = self._processed_mesh.clip(
+            normal=clip_normal,
+            origin=(0, 0, 0),
+            value=clip_value,
+            return_clipped=True,
+            crinkle=True,
+            invert=not invert,
+        )
 
-    pl = pv.Plotter(
-        off_screen=True,
-        window_size=list(window_size),
-    )
-    pl.add_mesh(
-        clips[0],
-        label="Clipped",
-        show_edges=True,
-        show_scalar_bar=False,
-        lighting=False,
-        cmap=colormap,
-        opacity=opacity,
-        scalars="vols",
-        clim=clim,
-    )
-
-    if add_remains_as_wireframe:
-        pl.add_mesh(
-            clips[1],
-            style="wireframe",
-            label="Remains",
+        plotter = self._plotter()
+        plotter.add_mesh(
+            clips[0],
+            label="Clipped",
+            show_edges=True,
             show_scalar_bar=False,
             lighting=False,
-            opacity=opacity,
-            cmap=colormap,
-            scalars="vols",
+            cmap=self.colormap,
+            opacity=self.opacity,
+            scalars=self._scalars,
+            clim=self._clim,
+        )
+
+        if add_remains_as_wireframe:
+            plotter.add_mesh(
+                clips[1],
+                style="wireframe",
+                label="Remains",
+                show_scalar_bar=False,
+                lighting=False,
+                opacity=self.opacity,
+                cmap=self.colormap,
+                scalars=self._scalars,
+                clim=self._clim,
+            )
+
+        self._set_positions_and_camera(plotter)
+
+        return Diagram(
+            centroids=self._centroids,
+            vertices=self._vertices,
+            target_volumes=self._volumes,
+            fitted_volumes=self._fitted_volumes,
+            weights=self._weights,
+            domain=self._domain,
+            seeds=self._seeds,
+            positions=self._positions,
+            plotter=plotter,
+            mesh=clips[0],
+        )
+
+    def threshed(self, value: tuple[float, float] | float, invert: bool) -> Diagram:
+        threshed_mesh = self._processed_mesh.threshold(value=value, invert=invert)
+
+        plotter = self._plotter()
+        plotter.add_mesh(
+            threshed_mesh,
+            show_edges=True,
+            show_scalar_bar=False,
+            lighting=False,
+            cmap=self.colormap,
+            opacity=self.opacity,
+            scalars=self._scalars,
+            clim=self._clim,
+        )
+        self._set_positions_and_camera(plotter)
+
+        return Diagram(
+            centroids=self._centroids,
+            vertices=self._vertices,
+            target_volumes=self._volumes,
+            fitted_volumes=self._fitted_volumes,
+            weights=self._weights,
+            domain=self._domain,
+            seeds=self._seeds,
+            positions=self._positions,
+            plotter=plotter,
+            mesh=threshed_mesh,
+        )
+
+    def full(self) -> Diagram:
+
+        plotter = self._plotter()
+        plotter.add_mesh(
+            self._processed_mesh,
+            show_edges=True,
+            show_scalar_bar=False,
+            lighting=False,
+            cmap=self.colormap,
+            opacity=self.opacity,
+            scalars=self._scalars,
+            clim=self._clim,
+        )
+        self._set_positions_and_camera(plotter)
+
+        return Diagram(
+            centroids=self._centroids,
+            vertices=self._vertices,
+            target_volumes=self._volumes,
+            fitted_volumes=self._fitted_volumes,
+            weights=self._weights,
+            domain=self._domain,
+            seeds=self._seeds,
+            positions=self._positions,
+            plotter=plotter,
+            mesh=self._processed_mesh,
+        )
+
+    def slice_(self, slice_normal: str, slice_value: float) -> Diagram:
+        def _sort_normals(normal: str) -> list[str]:
+            normals = [c for c in COORDINATES if c != normal]
+
+            return sorted(normals)
+
+        def _map_normal_to_domain(
+            normal: str, domain_map: dict[str, np.ndarray]
+        ) -> np.ndarray:
+            normals = _sort_normals(normal)
+
+            return np.array([domain_map[n] for n in normals])
+
+        def _map_normal_to_periodic(
+            normal: str, periodic_map: dict[str, bool]
+        ) -> list[bool]:
+            normals = _sort_normals(normal)
+            return [periodic_map[n] for n in normals]
+
+        def _map_normal_to_seeds(
+            normal: str, seeds_map: dict[str, np.ndarray]
+        ) -> np.ndarray:
+            normals = _sort_normals(normal)
+
+            return np.column_stack([seeds_map[n] for n in normals])
+
+        if slice_normal not in COORDINATES:
+            raise ValueError(
+                f"Invalid for slice_normal: {slice_normal}. Value must be one of {COORDINATES}."
+            )
+
+        if len(self._domain) != 3:
+            raise ValueError(
+                "Invalid space dimension. Slice can only be generated for a space dimension of 3"
+            )
+
+        domain_map = dict(zip(COORDINATES, self._domain))
+        domain = _map_normal_to_domain(slice_normal, domain_map)
+
+        a, b = domain_map[slice_normal]
+        if not (a <= slice_value <= b):
+            raise ValueError(
+                f"slice_center: {slice_value} is out of domain along the specified normal. Value must be in [{a}, {b}]."
+            )
+
+        periodic = None
+        if self._periodic is not None:
+            periodic_map = dict(zip(COORDINATES, self._periodic))
+            periodic = _map_normal_to_periodic(slice_normal, periodic_map)
+
+        seeds_map = dict(zip(COORDINATES, self._positions.T))
+        seeds = _map_normal_to_seeds(slice_normal, seeds_map)
+
+        omega, lens = build_domain(domain=domain, periodic=periodic)
+
+        weights = self._weights - (slice_value - seeds_map[slice_normal]) ** 2
+        pd = PowerDiagram(
+            positions=seeds,
+            weights=weights,
+            domain=omega,
+        )
+        if periodic is not None:
+            add_replicants(obj=pd, periodic=periodic, domain_lens=lens)
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".vtk", delete=True
+        ) as tmp_file:
+            filename = tmp_file.name
+
+            pd.display_vtk(filename)
+            mesh = pv.read(filename)
+
+        # Note: we use the mesh from the PowerDiagram object and not from the
+        # parent diagram.
+        processed_mesh, clim = process_mesh(
+            mesh=mesh,
+            target_volumes=self._volumes,
+            fitted_volumes=self._fitted_volumes,
+            phases=self._phases,
+            colorby=self.colorby,
+        )
+
+        plotter = self._plotter()
+        plotter.add_mesh(
+            processed_mesh,
+            show_edges=True,
+            show_scalar_bar=False,
+            lighting=False,
+            cmap=self.colormap,
+            opacity=self.opacity,
+            scalars=self._scalars,
             clim=clim,
         )
+        self._set_positions_and_camera(plotter, is_slice=True)
 
-    if add_final_seed_positions:
-        final_seed_positions = generator.get_positions()
-        add_points(plotter=pl, points=final_seed_positions)
+        vertices = {}
+        offsets, coords = pd.cell_polyhedra()
+        for i in range(len(offsets) - 1):
+            s, e = offsets[i : i + 2]
+            vertices[i] = coords[s:e].tolist()
 
-    if len(data.domain) == 2:
-        pl.camera_position = "xy"
-
-    return Diagram(
-        centroids=generator.get_centroids(),
-        vertices=generator.get_vertices(),
-        target_volumes=data.volumes,
-        fitted_volumes=fitted_volumes,
-        weights=generator.get_weights(),
-        domain=data.domain,
-        seeds=data.seeds,
-        positions=generator.get_positions(),
-        plotter=pl,
-        mesh=mesh,
-        clips=clips,
-    )
-
-
-def generate_full_diagram(
-    data: SynthetMicData,
-    generator: DiagramGenerator,
-    colorby: str,
-    colormap: str = "plasma",
-    window_size: tuple[int, int] = (400, 400),
-    add_final_seed_positions: bool = False,
-    opacity: float = 1.0,
-) -> Diagram:
-    fitted_volumes = generator.get_fitted_volumes()
-    mesh, clim = prepare_mesh(
-        mesh=generator.get_mesh(),
-        target_volumes=data.volumes,
-        fitted_volumes=fitted_volumes,
-        colorby=colorby,
-    )
-
-    pl = pv.Plotter(
-        off_screen=True,
-        window_size=list(window_size),
-    )
-
-    pl.add_mesh(
-        mesh,
-        show_edges=True,
-        show_scalar_bar=False,
-        lighting=False,
-        cmap=colormap,
-        opacity=opacity,
-        scalars="vols",
-        clim=clim,
-    )
-
-    if add_final_seed_positions:
-        final_seed_positions = generator.get_positions()
-        add_points(plotter=pl, points=final_seed_positions)
-
-    if len(data.domain) == 2:
-        pl.camera_position = "xy"
-
-    return Diagram(
-        centroids=generator.get_centroids(),
-        vertices=generator.get_vertices(),
-        target_volumes=data.volumes,
-        fitted_volumes=fitted_volumes,
-        weights=generator.get_weights(),
-        domain=data.domain,
-        seeds=data.seeds,
-        positions=generator.get_positions(),
-        plotter=pl,
-        mesh=mesh,
-    )
-
-
-def generate_slice_diagram(
-    data: SynthetMicData,
-    generator: DiagramGenerator,
-    slice_normal: str,
-    slice_value: float,
-    colorby: str,
-    colormap: str = "plasma",
-    window_size: tuple[int, int] = (400, 400),
-    opacity: float = 1.0,
-    add_final_seed_positions: bool = False,
-) -> Diagram:
-    def _sort_normals(normal: str) -> list[str]:
-        normals = [c for c in COORDINATES if c != normal]
-
-        return sorted(normals)
-
-    def _map_normal_to_domain(
-        normal: str, domain_map: dict[str, np.ndarray]
-    ) -> np.ndarray:
-        normals = _sort_normals(normal)
-
-        return np.array([domain_map[n] for n in normals])
-
-    def _map_normal_to_periodic(
-        normal: str, periodic_map: dict[str, bool]
-    ) -> list[bool]:
-        normals = _sort_normals(normal)
-        return [periodic_map[n] for n in normals]
-
-    def _map_normal_to_seeds(
-        normal: str, seeds_map: dict[str, np.ndarray]
-    ) -> np.ndarray:
-        normals = _sort_normals(normal)
-
-        return np.column_stack([seeds_map[n] for n in normals])
-
-    if slice_normal not in COORDINATES:
-        raise ValueError(
-            f"Invalid for slice_normal: {slice_normal}. Value must be one of {COORDINATES}."
+        return Diagram(
+            centroids=pd.centroids(),
+            vertices=vertices,
+            target_volumes=None,
+            fitted_volumes=pd.integrals(),
+            weights=weights,
+            domain=domain,
+            seeds=seeds,
+            positions=pd.get_positions(),
+            plotter=plotter,
+            mesh=processed_mesh,
         )
-
-    if len(data.domain) != 3:
-        raise ValueError(
-            "Invalid space dimension. Slice can only be generated for a space dimension of 3"
-        )
-
-    domain_map = dict(zip(COORDINATES, data.domain))
-    domain = _map_normal_to_domain(slice_normal, domain_map)
-
-    a, b = domain_map[slice_normal]
-    if not (a <= slice_value <= b):
-        raise ValueError(
-            f"slice_center: {slice_value} is out of domain along the specified normal. Value must be in [{a}, {b}]."
-        )
-
-    periodic = None
-    if data.periodic is not None:
-        periodic_map = dict(zip(COORDINATES, data.periodic))
-        periodic = _map_normal_to_periodic(slice_normal, periodic_map)
-
-    seeds_map = dict(zip(COORDINATES, generator.get_positions().T))
-    seeds = _map_normal_to_seeds(slice_normal, seeds_map)
-
-    omega, lens = build_domain(domain=domain, periodic=periodic)
-
-    weights = generator.get_weights() - (slice_value - seeds_map[slice_normal]) ** 2
-    pd = PowerDiagram(
-        positions=seeds,
-        weights=weights,
-        domain=omega,
-    )
-    if periodic is not None:
-        add_replicants(obj=pd, periodic=periodic, domain_lens=lens)
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".vtk", delete=True) as tmp_file:
-        filename = tmp_file.name
-
-        pd.display_vtk(filename)
-        mesh = pv.read(filename)
-
-    # Note: base target and fitted volumes are used
-    mesh, clim = prepare_mesh(
-        mesh=mesh,
-        target_volumes=data.volumes,
-        fitted_volumes=generator.get_fitted_volumes(),
-        colorby=colorby,
-    )
-    pl = pv.Plotter(
-        off_screen=True,
-        window_size=list(window_size),
-    )
-    pl.add_mesh(
-        mesh,
-        show_edges=True,
-        show_scalar_bar=False,
-        lighting=False,
-        cmap=colormap,
-        opacity=opacity,
-        scalars="vols",
-        clim=clim,
-    )
-    if add_final_seed_positions:
-        add_points(plotter=pl, points=seeds)
-    pl.camera_position = "xy"
-
-    vertices = {}
-    offsets, coords = pd.cell_polyhedra()
-    for i in range(len(offsets) - 1):
-        s, e = offsets[i : i + 2]
-        vertices[i] = coords[s:e].tolist()
-
-    return Diagram(
-        centroids=pd.centroids(),
-        vertices=vertices,
-        target_volumes=None,
-        fitted_volumes=pd.integrals(),
-        weights=weights,
-        domain=domain,
-        seeds=seeds,
-        positions=pd.get_positions(),
-        plotter=pl,
-        mesh=mesh,
-    )
 
 
 def fit(
@@ -842,29 +877,30 @@ def calculate_metrics(diagram: Diagram) -> Metrics:
     )
 
 
-def validate_df(
+def validate_upload(
     df: pd.DataFrame,
     expected_colnames: list[str],
-    expected_type: str,
     file: str,
     expected_dim: tuple[int, int] | None = None,
     bounds: dict[str, tuple[float, ...]] | None = None,
-) -> str | None:
+) -> Exception | None:
     df_colnames = df.columns.to_list()
 
-    if df_colnames != expected_colnames:
-        return f"""Column mismatch error in the uploaded {file} file: expected
-        {expected_colnames} but got {df_colnames}. Please try again."""
+    if not set(expected_colnames).issubset(set(df_colnames)):
+        return Exception(f"""Column mismatch error in the uploaded {file} file: expected
+        {expected_colnames} but got {df_colnames}. Please try again.""")
 
     if expected_dim is not None:
         if df.shape != expected_dim:
-            return f"""Dimension mismatch error in the uploaded {file} file:
-            expected dimension {expected_dim} but got {df.shape}. Please try again."""
+            return Exception(f"""Dimension mismatch error in the uploaded {file} file:
+            expected dimension {expected_dim} but got {df.shape}. Please try again.""")
 
-    df_dtypes = df.dtypes.values.tolist()
-    if not all(t == expected_type for t in df_dtypes):
-        return f"""Data type mismatch error in the uploaded {file}
-        file: expected all values to be of {expected_type} but got {df_dtypes}. Please try again."""
+    all_numeric = len(df.columns) == len(df.select_dtypes(include=[np.number]).columns)
+    if not all_numeric:
+        return Exception(f"""Data type mismatch error in the uploaded '{file}'
+        file: expected all entries to be numbers but got entries of type '{df.dtypes.values.tolist()}'.
+        Please try again.
+        """)
 
     if bounds is not None:
         msg = []
@@ -879,7 +915,7 @@ def validate_df(
                 )
 
         if msg:
-            return (
+            return Exception(
                 f"Value bound error in the uploaded {file} file: "
                 + "; ".join(msg)
                 + ". Please try again."
@@ -985,17 +1021,6 @@ def create_diagram_bytes(diagram: Diagram) -> bytes:
                     content = f.read()
 
             zipf.writestr(f"diagram.{ext}", content)
-
-        if diagram.clips is not None:
-            for i, clip in enumerate(diagram.clips, start=1):
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".vtk", delete=True
-                ) as temp_file:
-                    clip.save(temp_file.name, binary=False)
-                    with open(temp_file.name, "rb") as f:
-                        content = f.read()
-
-                zipf.writestr(f"clip_{i}.vtk", content)
 
     zip_buffer.seek(0)
 
@@ -1181,3 +1206,7 @@ def check_has_attribute(obj: object, attributes: list[str]) -> None:
                 Call the appropriate method with appropriate arguments before using this instance.
                 """
             )
+
+
+def unscale_from_minmax(scaled: float, min_: float, max_: float) -> float:
+    return scaled * (max_ - min_) + min_

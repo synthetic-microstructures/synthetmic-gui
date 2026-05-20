@@ -9,7 +9,15 @@ from shared.consts import (
     APP_VERSION,
     Distribution,
 )
-from shared.utils import COORDINATES, VOLUMES
+from shared.utils import COORDINATES, PHASES, VOLUMES
+
+
+def invert_switch(id: str = "invert") -> ui.Tag:
+    return ui.input_switch(
+        id=id,
+        label="Invert",
+        width="100%",
+    )
 
 
 def seeds_summary(seeds: pd.DataFrame | None, table_id: str) -> ui.Tag:
@@ -77,8 +85,10 @@ def grains_help_text() -> ui.HTML:
         and volume distribution for each phase. Note that each phase can have a different
         distribution.
 
-        If you choose to upload volumes instead, then the uploaded csv or txt file must have **only
-        one column** named '{VOLUMES}', and all its values must be float.
+        If you choose to upload volumes instead, then the uploaded csv or txt file must have
+        **at least one column** named '{VOLUMES}'. You can add an optional column named '{PHASES}',
+        which are non-negative integer labels, indicating the microstructure phases. For 
+        instance, a dual phase can have labels 0 and 1.
 
         We support three distributions: **constant**, **uniform**, and **lognormal**.
 

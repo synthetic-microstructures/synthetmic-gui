@@ -49,6 +49,7 @@ class Colorby(StrEnum):
     FITTED_VOLUMES = "fitted volumes"
     VOLUME_ERRORS = "volume errors"
     RANDOM = auto()
+    PHASES = auto()
 
 
 class DocSize(StrEnum):
@@ -95,6 +96,7 @@ class DiagramView(StrEnum):
     FULL = auto()
     SLICE = auto()
     CLIP = auto()
+    THRESHED = auto()
 
 
 class SeedInitializer(StrEnum):
