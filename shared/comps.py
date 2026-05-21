@@ -3,14 +3,12 @@ from typing import Any
 import faicons as fa
 from shiny import ui
 
-from shared.consts import FILL_COLOUR
-
 
 def sidebar(*args, **kwargs) -> ui.Sidebar:
     return ui.sidebar(
         *args,
         position="left",
-        width=560,
+        width=400,
         title=None,
         fillable=True,
         **kwargs,
@@ -27,12 +25,14 @@ def download_button(id: str, label: str, icon: str = "download") -> ui.Tag:
     )
 
 
-def input_action_button(id: str, label: str, icon: str) -> ui.Tag:
+def input_action_button(
+    id: str, label: str, icon: str, width: str | None = "100%"
+) -> ui.Tag:
     return ui.input_action_button(
         id=id,
         label=label,
         icon=fa.icon_svg(icon),
-        width="100%",
+        width=width,
         class_="btn btn-primary",
     )
 
@@ -112,19 +112,27 @@ def upload_handler(id: str, label: str) -> ui.Tag:
 def group_ui_elements(
     *args, title: ui.Tag | str, help_text: ui.Tag | str | ui.HTML
 ) -> ui.Tag:
-    return ui.card(
-        ui.card_header(
-            title,
+    return ui.tags.div(
+        ui.tags.div(
+            ui.tags.h4(title, class_="m-0"),
             ui.popover(
                 ui.span(
-                    fa.icon_svg("circle-info", fill=FILL_COLOUR),
-                    style="position:absolute; top: 5px; right: 7px;",
+                    fa.icon_svg("circle-info"),
+                    class_="text-muted",
+                    style="cursor: pointer;",
                 ),
                 help_text,
                 title=title,
             ),
+            style="""
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.5rem;
+            """,
         ),
         *args,
+        ui.hr(),
     )
 
 

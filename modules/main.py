@@ -89,7 +89,7 @@ def ui_():
                 label="Generate microstructure",
                 icon="person-running",
             ),
-            ui.hr(),
+            ui.p(),
             views.app_version_text(),
         ),
         id="sidebar",
@@ -257,22 +257,21 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     def periodicity() -> ui.Tag:
         space_dim = 2 if input.dim() == Dimension.TWO_D else 3
         ids = [f"is_{c}_periodic" for c in utils.COORDINATES[:space_dim]]
-        labels = [f"{c}-coordinate" for c in utils.COORDINATES[:space_dim]]
 
         return ui.tags.div(
             ui.markdown("Periodicity"),
-            views.periodic_input(ids, labels),
+            views.periodic_input(ids, utils.COORDINATES[:space_dim]),
         )
 
     @render.ui
     def algorithm() -> ui.Tag:
         ids = ("n_iter", "damp_param")
-        labels = ("Lloyd iterations", "Damp param")
+        labels = ("Lloyd iterations", "Damp parameter")
         defaults = (5, 1.0)
 
         if input.diagram() == DiagramType.LAGUERRE:
             ids += ("tol",)
-            labels += ("Volume tolerance",)
+            labels += ("Tolerance",)
             defaults += (1.0,)
 
         return views.numeric_input(ids=ids, labels=labels, defaults=defaults)

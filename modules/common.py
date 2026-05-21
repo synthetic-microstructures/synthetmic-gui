@@ -6,7 +6,7 @@ from matplotlib import colormaps
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 
 from shared import comps, styles, utils, views
-from shared.consts import FILL_COLOUR, PLOT_DEFAULTS, Colorby, DiagramView, Tab
+from shared.consts import PLOT_DEFAULTS, Colorby, DiagramView, Tab
 
 
 @module.ui
@@ -349,12 +349,10 @@ def server(
             )
 
         download_popover = ui.popover(
-            ui.span(
-                faicons.icon_svg(
-                    "download",
-                    fill=FILL_COLOUR,
-                ),
-                style=styles.diagram_download_trigger,
+            comps.input_action_button(
+                id="metrics_download_trigger",
+                label="Download metrics",
+                icon="download",
             ),
             ui.markdown("Are you sure you want to download the current metrics?"),
             ui.help_text(
@@ -455,12 +453,10 @@ def server(
             yield utils.create_diagram_bytes(diagram)
 
         download_popover = ui.popover(
-            ui.span(
-                faicons.icon_svg(
-                    "download",
-                    fill=FILL_COLOUR,
-                ),
-                style=styles.diagram_download_trigger,
+            comps.input_action_button(
+                id="diagram_download_trigger",
+                label="Download diagram",
+                icon="download",
             ),
             ui.markdown("Are you sure you want to download the current diagram view?"),
             ui.help_text(

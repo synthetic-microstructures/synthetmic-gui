@@ -33,7 +33,7 @@ def app_version_text() -> ui.Tag:
     return (ui.help_text(f"{APP_NAME} {APP_VERSION}"),)
 
 
-def dist_selection(id: str, label: str = "Choose a volume distribution") -> ui.Tag:
+def dist_selection(id: str, label: str = "Volume distribution") -> ui.Tag:
     return comps.selection(
         id=id,
         label=label,
@@ -125,7 +125,7 @@ def algo_help_text() -> ui.HTML:
         {list(COORDINATES)} for 3D case. The columns are the coordinates of the seeds. All
         values must be float.
 
-        **Volume tolerance**: relative percentage error for volumes (for Laguerre diagram).
+        **Tolerance**: relative percentage error for areas or volumes (for Laguerre diagram).
 
         **Lloyd iterations**: number of iterations of Lloyd's algorithm (move each seed to the
         centroid of its cell).

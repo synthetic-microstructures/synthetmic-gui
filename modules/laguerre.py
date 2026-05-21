@@ -77,11 +77,12 @@ def sidebar() -> ui.Tag:
             ui.tags.div(
                 phase_input(n=1),
                 ui.output_ui("phase1_dist_param"),
-                ui.hr(),
+                ui.p(),
                 phase_input(n=2),
                 ui.output_ui("phase2_dist_param"),
             ),
         ),
+        ui.p(),
         ui.output_text("d90_text"),
         ui.output_text("volume_percentage_text"),
         title="Grains",
