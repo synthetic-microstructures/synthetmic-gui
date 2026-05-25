@@ -30,7 +30,7 @@ app_ui = ui.page_fillable(
         navbar_options=ui.navbar_options(underline=True),
     ),
     title=APP_NAME,
-    theme=shinyswatch.theme.superhero,
+    theme=shinyswatch.theme.solar,
 )
 
 

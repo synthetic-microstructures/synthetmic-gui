@@ -8,7 +8,7 @@ def sidebar(*args, **kwargs) -> ui.Sidebar:
     return ui.sidebar(
         *args,
         position="left",
-        width=400,
+        width=410,
         title=None,
         fillable=True,
         **kwargs,
