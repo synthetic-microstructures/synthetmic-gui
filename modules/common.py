@@ -63,7 +63,13 @@ def server(
                     scaled=threshed_value[1], min_=min_, max_=max_
                 )
 
-                return viewer.threshed(value=(vmin, vmax), invert=input.invert())
+                try:
+                    return viewer.threshed(value=(vmin, vmax), invert=input.invert())
+                except Exception as e:
+                    return Exception(
+                        "Error in parsing plot options, possibly no grain size matches the specified thresholds."
+                        "More information: " + str(e),
+                    )
 
             case DiagramView.SLICE:
                 # when slice view is selected (in 3D mode) and user
