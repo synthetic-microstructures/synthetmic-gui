@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import shinyswatch
 from shiny import App, Inputs, Outputs, Session, ui
 
 from modules import home, main
@@ -30,7 +29,6 @@ app_ui = ui.page_fillable(
         navbar_options=ui.navbar_options(underline=True),
     ),
     title=APP_NAME,
-    theme=shinyswatch.theme.solar,
 )
 
 

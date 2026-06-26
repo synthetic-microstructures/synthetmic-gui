@@ -42,12 +42,12 @@ def sidebar() -> ui.Tag:
         comps.selection(
             id="phase",
             label="Choose a phase",
-            choices=[p for p in Phase],
+            choices=list(Phase),
             selected=Phase.SINGLE,
         ),
         ui.panel_conditional(
             f"input.phase === '{Phase.SINGLE}'",
-            ui.tags.div(
+            ui.div(
                 ui.row(
                     ui.column(
                         6,
@@ -64,7 +64,7 @@ def sidebar() -> ui.Tag:
         ),
         ui.panel_conditional(
             f"input.phase === '{Phase.UPLOAD}'",
-            ui.tags.div(
+            ui.div(
                 comps.upload_handler(
                     "uploaded_volumes",
                     "Upload volumes as a csv or txt file",
@@ -74,7 +74,7 @@ def sidebar() -> ui.Tag:
         ),
         ui.panel_conditional(
             f"input.phase === '{Phase.DUAL}'",
-            ui.tags.div(
+            ui.div(
                 phase_input(n=1),
                 ui.output_ui("phase1_dist_param"),
                 ui.p(),
@@ -82,7 +82,6 @@ def sidebar() -> ui.Tag:
                 ui.output_ui("phase2_dist_param"),
             ),
         ),
-        ui.p(),
         ui.output_text("d90_text"),
         ui.output_text("volume_percentage_text"),
         title="Grains",
@@ -122,7 +121,7 @@ def create_dist_params(
             return ui.help_text(f"{text} all volumes will be equal for this phase.")
 
         case Distribution.UNIFORM:
-            return ui.tags.div(
+            return ui.div(
                 views.numeric_input(
                     ids=[f"{id_prefix}_{p}" for p in ("low", "high")],
                     labels=["Low", "High"],
@@ -134,7 +133,7 @@ def create_dist_params(
             )
 
         case Distribution.LOGNORMAL:
-            return ui.tags.div(
+            return ui.div(
                 views.numeric_input(
                     ids=[f"{id_prefix}_{p}" for p in ("mean", "std")],
                     labels=["ECD Mean", "ECD Std"],

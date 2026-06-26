@@ -2327,7 +2327,7 @@ wheels = [
 
 [[package]]
 name = "shinyswatch"
-version = "0.10.0"
+version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "htmltools" },
@@ -2335,9 +2335,9 @@ dependencies = [
     { name = "shiny" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0f/02/09f4f3aa08bf8cb65505df2b890352ca4e8d1ec40006acafdd5c580041df/shinyswatch-0.10.0.tar.gz", hash = "sha256:8a5320b39210f1d17209c1b850af3ffde8eff17f14f80cb59e618e31c730d59d", size = 1342646, upload-time = "2026-03-20T20:49:04.136Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d4/04/4ac4c5a3ef07163440ebb051dad50efbe3c648005c0cb71c6a7f7deabb8c/shinyswatch-0.11.0.tar.gz", hash = "sha256:c7c4ed4eb8131980697df5ce4a8b87b681ed80422fe7dca0a9d2bfdacba3ff2e", size = 1413496, upload-time = "2026-06-01T22:24:26.358Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/aa/ee71cc77cc9a3c3cf33096d65ab9cd3824536e3749eeffc9d08939da1032/shinyswatch-0.10.0-py3-none-any.whl", hash = "sha256:5164f3677a2e15794349fc90e6e3bf5d33b753d4cf21a44cff6510d8e8b06d83", size = 1357657, upload-time = "2026-03-20T20:49:02.543Z" },
+    { url = "https://files.pythonhosted.org/packages/15/c2/7498240c02e46be103e70ad8e938f9898afe8047c4e690b50b7b11140a5c/shinyswatch-0.11.0-py3-none-any.whl", hash = "sha256:2c4dd5036d00fe8f8bcd5ed90e8b433cfa64cfcff7b91424a768c0df9cd7e6ed", size = 1431623, upload-time = "2026-06-01T22:24:24.75Z" },
 ]
 
 [[package]]
@@ -2475,7 +2475,7 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shiny", extras = ["theme"], specifier = "==1.6.3" },
     { name = "shiny-validate", specifier = ">=0.1.3" },
-    { name = "shinyswatch", specifier = "==0.10.0" },
+    { name = "shinyswatch", specifier = "==0.11.0" },
     { name = "shinywidgets", specifier = ">=0.6.2" },
     { name = "synthetmic", specifier = "==0.2.4" },
     { name = "tbx", marker = "extra == 'deploy'", git = "https://github.com/Rasheed19/tbx.git" },

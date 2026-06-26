@@ -21,12 +21,12 @@ from shared.consts import (
 @module.ui
 def ui_():
     sidebar = comps.sidebar(
-        ui.tags.div(
+        ui.div(
             comps.group_ui_elements(
                 comps.selection(
                     id="diagram",
                     label="Choose a diagram type",
-                    choices=[d for d in DiagramType],
+                    choices=list(DiagramType),
                     selected=DiagramType.LAGUERRE,
                 ),
                 title="Diagram",
@@ -36,7 +36,7 @@ def ui_():
                 comps.selection(
                     id="dim",
                     label="Choose a dimension",
-                    choices=[d for d in Dimension],
+                    choices=list(Dimension),
                     selected=Dimension.THREE_D,
                 ),
                 ui.output_ui("box_dim"),
@@ -54,12 +54,12 @@ def ui_():
                 comps.selection(
                     id="seeds_init",
                     label="Choose how seeds are initialized",
-                    choices=[i for i in SeedInitializer],
+                    choices=list(SeedInitializer),
                     selected=SeedInitializer.RANDOM,
                 ),
                 ui.panel_conditional(
                     f"input.seeds_init === '{SeedInitializer.RANDOM}'",
-                    ui.tags.div(
+                    ui.div(
                         ui.input_numeric(
                             id="random_state",
                             label="Seeds random state",
@@ -72,7 +72,7 @@ def ui_():
                 ),
                 ui.panel_conditional(
                     f"input.seeds_init === '{SeedInitializer.UPLOAD}'",
-                    ui.tags.div(
+                    ui.div(
                         comps.upload_handler(
                             "uploaded_seeds",
                             "Uplaod seeds as a csv or txt file",
@@ -258,7 +258,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         space_dim = 2 if input.dim() == Dimension.TWO_D else 3
         ids = [f"is_{c}_periodic" for c in utils.COORDINATES[:space_dim]]
 
-        return ui.tags.div(
+        return ui.div(
             ui.markdown("Periodicity"),
             views.periodic_input(ids, utils.COORDINATES[:space_dim]),
         )

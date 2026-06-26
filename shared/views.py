@@ -30,7 +30,7 @@ def seeds_summary(seeds: pd.DataFrame | None, table_id: str) -> ui.Tag:
 
 
 def app_version_text() -> ui.Tag:
-    return (ui.help_text(f"{APP_NAME} {APP_VERSION}"),)
+    return ui.help_text(f"{APP_NAME} {APP_VERSION}")
 
 
 def dist_selection(id: str, label: str = "Volume distribution") -> ui.Tag:

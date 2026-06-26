@@ -23,7 +23,7 @@ from shared.consts import (
 
 def citation_text() -> ui.TagList:
     return ui.TagList(
-        ui.tags.h4("Citation"),
+        ui.h4("Citation"),
         ui.markdown(
             f"""
             If you use this app in any publication or report, please cite it as follows:
@@ -36,7 +36,7 @@ def citation_text() -> ui.TagList:
 
 def affliation_text() -> ui.TagList:
     return ui.TagList(
-        ui.tags.h4("About the research team"),
+        ui.h4("About the research team"),
         ui.row(
             *[
                 ui.column(
@@ -54,16 +54,16 @@ def affliation_text() -> ui.TagList:
                 for width, img, link in zip(
                     (4, 3, 5),
                     (
-                        "MDICE_logo.png",
-                        "HWU_logo.jpg",
-                        "UOG_logo.png",
+                        "mdice-logo.png",
+                        "hwu-logo.png",
+                        "uog-logo.png",
                     ),
                     (MDICE_LINK, HW_LINK, UOG_LINK),
                 )
             ],
             style="align-items: flex-end;",
         ),
-        ui.tags.br(),
+        ui.br(),
         ui.markdown(
             f"""
             This app has been developed by researchers in the
@@ -83,8 +83,8 @@ def affliation_text() -> ui.TagList:
 
 def feedback_text() -> ui.TagList:
     return ui.TagList(
-        ui.tags.h4("We'd love to hear from you!"),
-        ui.tags.div(
+        ui.h4("We'd love to hear from you!"),
+        ui.div(
             ui.markdown(
                 f"""
             If you encounter any bug or have suggestions, please
@@ -109,7 +109,7 @@ def feedback_text() -> ui.TagList:
 
 def about_text() -> ui.TagList:
     return ui.TagList(
-        ui.tags.h4("About"),
+        ui.h4("About"),
         ui.markdown(
             f"""
         **{APP_NAME}** is a web app for generating 2D and 3D synthetic
@@ -126,7 +126,7 @@ def about_text() -> ui.TagList:
 
 def usage_text() -> ui.TagList:
     return ui.TagList(
-        ui.tags.h4("Usage"),
+        ui.h4("Usage"),
         ui.markdown(
             """
         Using the app is extremely easy. It can be done in **5 steps**:
@@ -307,16 +307,16 @@ def create_example_data_card(
 
 @module.ui
 def ui_() -> ui.Tag:
-    return ui.tags.div(
-        ui.tags.h3(APP_NAME),
+    return ui.div(
+        ui.h3(APP_NAME),
         ui.markdown(
             "An interactive GUI for generating synthetic polycrystalline microstructures."
         ),
-        ui.tags.hr(),
+        ui.hr(),
         about_text(),
-        ui.tags.hr(),
+        ui.hr(),
         usage_text(),
-        ui.tags.hr(),
+        ui.hr(),
         starting_point_text(),
         ui.row(
             ui.column(
@@ -326,14 +326,14 @@ def ui_() -> ui.Tag:
                     comps.selection(
                         id="example_data",
                         label="Choose an example data to download",
-                        choices=[e for e in ExampleDataName],
+                        choices=list(ExampleDataName),
                         selected=ExampleDataName.EBSD,
                         width="100%",
                     ),
                     comps.selection(
                         id="example_data_extension",
                         label="Choose a file extension for the example data",
-                        choices=[e for e in PropertyExtension],
+                        choices=list(PropertyExtension),
                         selected=PropertyExtension.CSV,
                         width="100%",
                     ),
@@ -348,13 +348,13 @@ def ui_() -> ui.Tag:
                 ui.output_ui("example_data_card"),
             ),
         ),
-        ui.tags.hr(),
+        ui.hr(),
         affliation_text(),
-        ui.tags.hr(),
+        ui.hr(),
         citation_text(),
-        ui.tags.hr(),
+        ui.hr(),
         feedback_text(),
-        ui.tags.hr(),
+        ui.hr(),
         views.app_version_text(),
         class_="container-sm",
         style="max-width: 1000px; overflow: auto;",
