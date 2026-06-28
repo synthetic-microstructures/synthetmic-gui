@@ -6,12 +6,72 @@ from matplotlib import colormaps
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 
 from shared import comps, styles, utils, views
-from shared.consts import FILL_COLOUR, PLOT_DEFAULTS, Colorby, DiagramView, Tab
+from shared.consts import PLOT_DEFAULTS, Colorby, DiagramView
 
 
 @module.ui
 def ui_() -> ui.Tag:
-    return ui.output_ui(id="main", fill=True, fillable=True)
+    return ui.div(
+        ui.row(
+            ui.column(
+                3,
+                ui.card(
+                    ui.card_header("Common plot options"),
+                    ui.div(
+                        comps.selection(
+                            id="view",
+                            label="Choose a diagram to view",
+                            choices=list(DiagramView),
+                            selected=DiagramView.FULL,
+                            width="100%",
+                        ),
+                        comps.selection(
+                            id="colorby",
+                            label="Color by",
+                            choices=[c for c in Colorby],
+                            selected=PLOT_DEFAULTS["colorby"],
+                            width="100%",
+                        ),
+                        comps.selection(
+                            id="colormap",
+                            label="Choose a colormap",
+                            choices=sorted(list(colormaps)),
+                            selected=PLOT_DEFAULTS["colormap"],
+                            width="100%",
+                        ),
+                        ui.input_slider(
+                            id="opacity",
+                            label="Diagram opacity",
+                            min=0.0,
+                            max=1.0,
+                            value=PLOT_DEFAULTS["opacity"],
+                            ticks=True,
+                            width="100%",
+                        ),
+                        ui.input_switch(
+                            id="add_final_seed_positions",
+                            label="Add final seed positions",
+                            width="100%",
+                        ),
+                        comps.input_action_button(
+                            id="reset_plot_options",
+                            label="Reset common plot options to defaults",
+                            icon="gear",
+                        ),
+                    ),
+                ),
+                ui.output_ui("extra_opts"),
+            ),
+            ui.column(
+                9,
+                ui.navset_card_underline(
+                    ui.nav_spacer(),
+                    ui.nav_panel("Microstructure", ui.output_ui("diagram_tab_card")),
+                    ui.nav_panel("Metrics", ui.output_ui("metrics_tab_card")),
+                ),
+            ),
+        ),
+    )
 
 
 @module.server
@@ -19,94 +79,24 @@ def server(
     input: Inputs,
     output: Outputs,
     session: Session,
-    processed_data: utils.ProcessedData,
-    global_generate: reactive.Value,
+    processed_data: reactive.Value,
 ) -> None:
 
-    @render.ui
-    def main() -> ui.Tag:
-        view_choices = list(DiagramView)
-        if len(processed_data.sm_data.domain) == 2:
-            view_choices.remove(DiagramView.SLICE)
-
-        return ui.div(
-            ui.div(
-                ui.input_radio_buttons(
-                    id="tab",
-                    label=None,
-                    choices=list(Tab),
-                    inline=True,
-                ),
-                style=styles.tab_radio_button,
-            ),
-            ui.row(
-                ui.column(
-                    3,
-                    ui.card(
-                        ui.card_header("Common plot options"),
-                        ui.div(
-                            comps.selection(
-                                id="view",
-                                label="Choose a diagram to view",
-                                choices=view_choices,
-                                selected=DiagramView.FULL,
-                                width="100%",
-                            ),
-                            comps.selection(
-                                id="colorby",
-                                label="Color by",
-                                choices=[c for c in Colorby],
-                                selected=PLOT_DEFAULTS["colorby"],
-                                width="100%",
-                            ),
-                            comps.selection(
-                                id="colormap",
-                                label="Choose a colormap",
-                                choices=sorted(list(colormaps)),
-                                selected=PLOT_DEFAULTS["colormap"],
-                                width="100%",
-                            ),
-                            ui.input_slider(
-                                id="opacity",
-                                label="Diagram opacity",
-                                min=0.0,
-                                max=1.0,
-                                value=PLOT_DEFAULTS["opacity"],
-                                ticks=True,
-                                width="100%",
-                            ),
-                            ui.input_switch(
-                                id="add_final_seed_positions",
-                                label="Add final seed positions",
-                                width="100%",
-                            ),
-                            comps.input_action_button(
-                                id="reset_plot_options",
-                                label="Reset common plot options to defaults",
-                                icon="gear",
-                            ),
-                        ),
-                    ),
-                    ui.output_ui("extra_opts"),
-                ),
-                ui.column(
-                    9,
-                    ui.output_ui("selected_tab"),
-                ),
-            ),
-        )
-
     @reactive.calc
-    def _diagram() -> utils.Diagram | Exception:
+    def _diagram() -> utils.Diagram | Exception | None:
+        d = processed_data()
+        if not isinstance(d, utils.ProcessedData):
+            return d
+
         viewer = utils.DiagramViewer(
-            processed_data=processed_data,
+            processed_data=d,
             colorby=input.colorby(),
             colormap=input.colormap(),
             opacity=input.opacity(),
             add_final_seed_positions=input.add_final_seed_positions(),
         )
 
-        domain = processed_data.sm_data.domain
+        domain = d.sm_data.domain
 
         match input.view():
             case DiagramView.FULL:
@@ -137,7 +127,7 @@ def server(
                 # full view and quit.
                 if len(domain) == 2:
                     return Exception(
-                        "Slicing is only available for 3D case. Defaulting back to full diagram."
+                        "Slicing is only available for 3D case. Please choose a different view."
                     )
 
                 return viewer.slice_(
@@ -178,36 +168,12 @@ def server(
                 )
 
     @reactive.calc
-    def _metrics() -> utils.Metrics | Exception:
+    def _metrics() -> utils.Metrics | Exception | None:
         diagram = _diagram()
-        if isinstance(diagram, Exception):
+        if not isinstance(diagram, utils.Diagram):
             return diagram
 
         return utils.calculate_metrics(diagram)
-
-    @reactive.effect
-    @reactive.event(global_generate)
-    def _():
-        # to ensure the current plot settings are remembered after
-        # reclicking generate button
-        if (
-            input.view() == DiagramView.SLICE
-            and len(processed_data.sm_data.domain) == 2
-        ):
-            ui.update_select(
-                id="view",
-                selected=DiagramView.FULL,
-            )
-        else:
-            ui.update_select(id="view", selected=input.view())
-
-        ui.update_radio_buttons(id="tab", selected=input.tab())
-        ui.update_select(id="colorby", selected=input.colorby())
-        ui.update_select(id="colormap", selected=input.colormap())
-        ui.update_slider(id="opacity", value=input.opacity())
-        ui.update_switch(
-            id="add_final_seed_positions", value=input.add_final_seed_positions()
-        )
 
     @reactive.effect
     @reactive.event(input.reset_plot_options)
@@ -231,7 +197,11 @@ def server(
 
     @render.ui
     def slice_value_slider() -> ui.Tag | None:
-        domain = processed_data.sm_data.domain
+        d = processed_data()
+        if not isinstance(d, utils.ProcessedData):
+            return
+
+        domain = d.sm_data.domain
         coordinates = utils.COORDINATES[: len(domain)]
 
         if input.slice_normal() not in coordinates:
@@ -251,7 +221,11 @@ def server(
 
     @render.ui
     def clip_value_slider() -> ui.Tag | None:
-        domain = processed_data.sm_data.domain
+        d = processed_data()
+        if not isinstance(d, utils.ProcessedData):
+            return
+
+        domain = d.sm_data.domain
         coordinates = utils.COORDINATES[: len(domain)]
 
         if input.clip_normal() not in coordinates:
@@ -274,7 +248,12 @@ def server(
 
     @render.ui
     def extra_opts() -> ui.Tag:
-        domain = processed_data.sm_data.domain
+        d = processed_data()
+        if not isinstance(d, utils.ProcessedData):
+            return
+
+        domain = d.sm_data.domain
+
         opts = ()
         match input.view():
             case DiagramView.FULL:
@@ -347,12 +326,15 @@ def server(
                     only view the {input.view()} microstructure
                     by selecting the **Microstructure** button.
                     """
-                ),
+                )
             )
 
         metrics = _metrics()
+        if metrics is None:
+            return views.no_processed_data_text()
+
         if isinstance(metrics, Exception):
-            comps.error_notification(str(metrics))
+            comps.show_notification(str(metrics), type_="error")
             return
 
         @render.plot
@@ -371,12 +353,11 @@ def server(
             )
 
         download_popover = ui.popover(
-            ui.span(
-                faicons.icon_svg(
-                    "download",
-                    fill=FILL_COLOUR,
-                ),
-                style=styles.diagram_download_trigger,
+            comps.input_action_button(
+                id="metrics_download_trigger",
+                label="Download",
+                icon="download",
+                width=None,
             ),
             ui.markdown("Are you sure you want to download the current metrics?"),
             ui.help_text(
@@ -435,6 +416,7 @@ def server(
                     value=v_formated,
                     full_screen=False,
                     showcase=faicons.icon_svg("chart-line"),
+                    theme="blue",
                 )
             )
 
@@ -442,8 +424,8 @@ def server(
             ui.row(ui.layout_column_wrap(*stats[:4])),
             ui.row(ui.layout_column_wrap(*stats[4:])),
             ui.card(
-                ui.output_plot("plot_metrics"),
-                download_popover,
+                ui.card_body(ui.output_plot("plot_metrics")),
+                ui.card_footer(download_popover, style="border: none"),
                 full_screen=True,
                 style=styles.metrics_card,
             ),
@@ -452,8 +434,11 @@ def server(
     @render.ui
     def diagram_tab_card() -> ui.Tag | None:
         diagram = _diagram()
+        if diagram is None:
+            return views.no_processed_data_text()
+
         if isinstance(diagram, Exception):
-            comps.error_notification(str(diagram))
+            comps.show_notification(str(diagram), type_="error")
             return
 
         @render.ui
@@ -464,7 +449,7 @@ def server(
                 html = f.read().decode("utf-8")
 
             return ui.tags.iframe(
-                srcdoc=html, style="width:100%; height:100%; border:none;"
+                srcdoc=html, style="width: 100%; height: 100%; border: none;"
             )
 
         @render.download(
@@ -477,12 +462,11 @@ def server(
             yield utils.create_diagram_bytes(diagram)
 
         download_popover = ui.popover(
-            ui.span(
-                faicons.icon_svg(
-                    "download",
-                    fill=FILL_COLOUR,
-                ),
-                style=styles.diagram_download_trigger,
+            comps.input_action_button(
+                id="diagram_download_trigger",
+                label="Download",
+                icon="download",
+                width=None,
             ),
             ui.markdown("Are you sure you want to download the current diagram view?"),
             ui.help_text(
@@ -499,19 +483,8 @@ def server(
         )
 
         return ui.card(
-            ui.output_ui("display_diagram"),
-            download_popover,
+            ui.card_body(ui.output_ui("display_diagram")),
+            ui.card_footer(download_popover, style="border: none"),
             full_screen=True,
             style=styles.diagram_card,
         )
-
-    @render.ui
-    def selected_tab() -> ui.Tag:
-        tabs = dict(
-            zip(
-                Tab,
-                (ui.output_ui("diagram_tab_card"), ui.output_ui("metrics_tab_card")),
-            )
-        )
-
-        return tabs[input.tab()]

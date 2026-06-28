@@ -5,7 +5,7 @@ import pandas as pd
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 from shiny.types import FileInfo
 from shiny_validate import InputValidator
-from synthetmic.data.utils import sample_random_seeds
+from synthetmic.data.utils import SynthetMicData, sample_random_seeds
 
 from modules import common, laguerre, voronoi
 from shared import comps, utils, views
@@ -87,7 +87,7 @@ def ui_():
             comps.input_task_button(
                 id="generate",
                 label="Generate microstructure",
-                icon="person-running",
+                icon="arrow-right",
             ),
             ui.p(),
             views.app_version_text(),
@@ -107,6 +107,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
 
     _uploaded_seeds = reactive.Value(value=None)
     _uploaded_volumes = reactive.Value(value=None)
+    _processed_data = reactive.Value(value=None)
 
     @reactive.effect
     def _() -> None:
@@ -121,15 +122,16 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         if file is not None:
             _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))
 
-    @reactive.calc
+    @reactive.effect
     @reactive.event(input.generate)
-    def _fit() -> utils.ProcessedData | Exception:
+    def _() -> None:
         if input.dim() == Dimension.THREE_D:
             iv.add_rule("height", utils.req_gt(rhs=0))
 
         iv.enable()
         if not iv.is_valid():
-            return Exception(views.invalid_input_text())
+            _processed_data.set(Exception(views.invalid_input_text()))
+            return
 
         box_dim = utils.parse_box_dim(
             utils.Box(
@@ -157,7 +159,8 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                 uploaded_volumes=_uploaded_volumes(),
             )
             if isinstance(out, Exception):
-                return out
+                _processed_data.set(out)
+                return
 
             volumes, phases = out
             n_grains = len(volumes)
@@ -167,7 +170,8 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             iv.add_rule("n_grains", utils.req_int_gt(rhs=0))
             iv.enable()
             if not iv.is_valid():
-                return Exception(views.invalid_input_text())
+                _processed_data.set(Exception(views.invalid_input_text()))
+                return
 
             n_grains = input.n_grains()
             volumes = None
@@ -179,9 +183,12 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             iv.enable()
 
             if not iv.is_valid():
-                return Exception(
-                    "Invalid random seed. Please check your input and try again."
+                _processed_data.set(
+                    Exception(
+                        "Invalid random seed. Please check your input and try again."
+                    )
                 )
+                return
 
             seeds = sample_random_seeds(
                 domain=domain,
@@ -192,7 +199,10 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         else:
             seeds = _uploaded_seeds()
             if seeds is None:
-                return Exception("Seeds not uploaded. Upload seeds and try again.")
+                _processed_data.set(
+                    Exception("Seeds not uploaded. Upload seeds and try again.")
+                )
+                return
 
             coords = list(utils.COORDINATES)[:space_dim]
             res = utils.validate_upload(
@@ -203,29 +213,43 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                 bounds=dict(zip(coords, domain)),
             )
             if isinstance(res, Exception):
-                return res
+                _processed_data.set(res)
+                return
 
             seeds = seeds[coords].values
 
         # In case of Laguerre, check if len of volumes and seeds match
         if input.diagram() == DiagramType.LAGUERRE:
             if len(volumes) != len(seeds):
-                return Exception(
-                    f"""The number of samples in seeds and grain volumes do not match:
+                _processed_data.set(
+                    Exception(
+                        f"""The number of samples in seeds and grain volumes do not match:
                   len(seeds)={len(seeds)}, len(volumes)={len(volumes)}"""
+                    )
                 )
+                return
 
-        sm_data, generator = utils.fit(
+        config = utils.AlgorithmConfig(
+            tol=tol,
+            n_iter=input.n_iter(),
+            damp_param=input.damp_param(),
+            verbose=False,
+        )
+        sm_data = SynthetMicData(
             domain=domain,
             seeds=seeds,
             volumes=volumes,
             periodic=list(periodic),
-            tol=tol,
-            n_iter=input.n_iter(),
-            damp_param=input.damp_param(),
+            init_weights=None,
         )
+        sdg = utils.ShinyDiagramGenerator(config)
+        sdg.init_pbar()
+        generator = sdg.fit(sm_data)
+        sdg.close_pbar()
 
-        return utils.ProcessedData(sm_data=sm_data, generator=generator, phases=phases)
+        _processed_data.set(
+            utils.ProcessedData(sm_data=sm_data, generator=generator, phases=phases)
+        )
 
     @reactive.effect
     @reactive.event(input.generate)
@@ -358,12 +382,4 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             if msg:
                 return " ".join(msg)
 
-    @reactive.effect
-    @reactive.event(input.generate)
-    def _():
-        f = _fit()
-        if isinstance(f, Exception):
-            comps.error_notification(str(f))
-
-        else:
-            common.server("common", f, input.generate)
+    common.server("common", _processed_data)

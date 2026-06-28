@@ -12,6 +12,17 @@ from shared.consts import (
 from shared.utils import COORDINATES, PHASES, VOLUMES
 
 
+def no_processed_data_text() -> ui.Tag:
+    return ui.help_text(
+        ui.markdown(
+            """
+            No processed data detected. Please check help on how to use this
+            app on the **Home** page.
+            """
+        )
+    )
+
+
 def invert_switch(id: str = "invert") -> ui.Tag:
     return ui.input_switch(
         id=id,

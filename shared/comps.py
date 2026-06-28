@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 import faicons as fa
 from shiny import ui
@@ -13,6 +13,7 @@ def sidebar(*args, **kwargs) -> ui.Sidebar:
         width=500,
         title=None,
         fillable=True,
+        bg="#f2f2f2",
         **kwargs,
     )
 
@@ -49,14 +50,15 @@ def input_task_button(id: str, label: str, icon: str) -> ui.Tag:
     )
 
 
-def error_notification(msg: str) -> None:
+def show_notification(
+    msg: str, type_: Literal["default", "message", "error", "warning"] = "default"
+) -> None:
     ui.notification_show(
         msg,
-        type="error",
-        duration=5,
+        duration=10,
+        close_button=True,
+        type=type_,
     )
-
-    return None
 
 
 def selection(

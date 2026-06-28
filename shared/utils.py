@@ -3,7 +3,7 @@ import json
 import pathlib
 import tempfile
 import zipfile
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
 import matplotlib.pyplot as plt
@@ -14,6 +14,7 @@ import pyvista as pv
 from matplotlib.figure import Figure
 from pysdot import PowerDiagram
 from scipy.stats import norm
+from shiny import ui
 from shiny.types import ImgData
 from shiny_validate import check
 from synthetmic import LaguerreDiagramGenerator, VoronoiDiagramGenerator
@@ -92,6 +93,14 @@ class ProcessedData:
     sm_data: SynthetMicData
     generator: DiagramGenerator
     phases: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class AlgorithmConfig:
+    n_iter: int
+    tol: float | None
+    damp_param: float
+    verbose: bool = False
 
 
 def parse_box_dim(box: Box, dim: str) -> tuple[float, ...]:
@@ -239,8 +248,6 @@ def add_points(plotter: pv.Plotter, points: np.ndarray) -> None:
         point_size=5,
     )
 
-    return None
-
 
 class DiagramViewer:
     def __init__(
@@ -291,8 +298,6 @@ class DiagramViewer:
 
         if len(self._domain) == 2 or is_slice:
             plotter.camera_position = "xy"
-
-        return None
 
     def clip(
         self,
@@ -540,42 +545,47 @@ class DiagramViewer:
         )
 
 
-def fit(
-    domain: np.ndarray,
-    seeds: np.ndarray,
-    volumes: np.ndarray | None,
-    periodic: list[bool],
-    tol: float | None,
-    n_iter: int,
-    damp_param: float,
-) -> tuple[SynthetMicData, DiagramGenerator]:
-    if volumes is None:
-        generator = VoronoiDiagramGenerator(
-            n_iter=n_iter, damp_param=damp_param, verbose=False
-        )
-        generator.fit(seeds=seeds, domain=domain, periodic=periodic)
-
-    else:
-        generator = LaguerreDiagramGenerator(
-            tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=False
-        )
-        generator.fit(
-            seeds=seeds,
-            volumes=volumes,
-            domain=domain,
-            periodic=periodic,
-            init_weights=None,
+def generator_factory(config: AlgorithmConfig) -> DiagramGenerator:
+    if config.tol is None:
+        return VoronoiDiagramGenerator(
+            n_iter=config.n_iter,
+            damp_param=config.damp_param,
+            verbose=config.verbose,
         )
 
-    data = SynthetMicData(
-        seeds=seeds,
-        volumes=volumes,
-        domain=domain,
-        periodic=periodic,
-        init_weights=None,
-    )
+    return LaguerreDiagramGenerator(**asdict(config))
 
-    return data, generator
+
+class ShinyDiagramGenerator:
+    def __init__(self, config: AlgorithmConfig):
+        self.config = config
+        self._generator = generator_factory(config)
+
+    def progress_callback(self, msg: str) -> None:
+        self._value = min(self._value + 1, self._p.max)
+        self._p.set(value=self._value, message="Running...", detail=msg)
+
+    def init_pbar(self) -> None:
+        self._p = ui.Progress(
+            min=0,
+            max=max(self.config.n_iter, 1),
+        )
+        self._value = 0
+
+        self._p.set(value=self._p.min, message="Initialising...")
+        self._generator._print_msg = self.progress_callback
+
+    def close_pbar(self) -> None:
+        self._p.close()
+
+    def fit(self, data: SynthetMicData) -> DiagramGenerator:
+
+        if isinstance(self._generator, VoronoiDiagramGenerator):
+            return self._generator.fit(
+                seeds=data.seeds, domain=data.domain, periodic=data.periodic
+            )
+
+        return self._generator.fit(**asdict(data))
 
 
 def gt(rhs: float, allow_none: bool = False) -> Callable[[float | None], str | None]:
@@ -735,8 +745,6 @@ def check_space_dim(space_dim: int) -> None:
         raise ValueError(
             f"Invalid space_dim '{space_dim}'. Value must be either 2 or 3"
         )
-
-    return None
 
 
 def calculate_ecds(volumes: np.ndarray, space_dim: int) -> np.ndarray:
@@ -920,8 +928,6 @@ def validate_upload(
                 + "; ".join(msg)
                 + ". Please try again."
             )
-
-    return None
 
 
 def summarize_df(df: pd.DataFrame) -> pd.DataFrame:
