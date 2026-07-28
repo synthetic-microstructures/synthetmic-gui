@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Sequence
 
 import pandas as pd
 from shiny import ui
@@ -10,6 +10,22 @@ from shared.consts import (
     Distribution,
 )
 from shared.utils import COORDINATES, PHASES, VOLUMES
+
+
+def busy_modal(msg: str) -> None:
+    ui.modal_show(
+        ui.modal(
+            ui.div(
+                {"class": "text-center p-4"},
+                ui.div({"class": "spinner-border text-primary"}),
+                ui.br(),
+                ui.p(msg),
+                ui.help_text("While waiting, please check the progress below."),
+            ),
+            easy_close=False,
+            footer=None,
+        )
+    )
 
 
 def no_processed_data_text() -> ui.Tag:
@@ -53,7 +69,9 @@ def dist_selection(id: str, label: str = "Volume distribution") -> ui.Tag:
     )
 
 
-def numeric_input(ids: list[str], labels: list[str], defaults: list[Any]) -> ui.Tag:
+def numeric_input(
+    ids: Sequence[str], labels: Sequence[str], defaults: Sequence[Any]
+) -> ui.Tag:
     width = 12 // len(ids)
     cols = [
         ui.column(

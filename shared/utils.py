@@ -4,7 +4,7 @@ import pathlib
 import tempfile
 import zipfile
 from dataclasses import asdict, dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as tck
@@ -14,13 +14,15 @@ import pyvista as pv
 from matplotlib.figure import Figure
 from pysdot import PowerDiagram
 from scipy.stats import norm
-from shiny import ui
 from shiny.types import ImgData
 from shiny_validate import check
-from synthetmic import LaguerreDiagramGenerator, VoronoiDiagramGenerator
+from synthetmic import (
+    DiagramConfig,
+    DiagramGenerator,
+    LaguerreDiagramGenerator,
+    VoronoiDiagramGenerator,
+)
 from synthetmic.data import paper
-from synthetmic.data.utils import SynthetMicData
-from synthetmic.generate import DiagramGenerator
 from synthetmic.utils import add_replicants, build_domain
 
 from shared.consts import (
@@ -48,7 +50,7 @@ class Diagram:
     seeds: np.ndarray
     positions: np.ndarray
     domain: np.ndarray
-    mesh: pv.PolyData | pv.UnstructuredGrid
+    mesh: pv.DataObject
     plotter: pv.Plotter
 
 
@@ -78,21 +80,20 @@ class Event:
 class Box:
     length: float
     breadth: float
-    height: float | None
+    height: float
 
 
 @dataclass(frozen=True, slots=True)
 class Periodic:
     is_x_periodic: bool
     is_y_periodic: bool
-    is_z_periodic: bool | None
+    is_z_periodic: bool
 
 
 @dataclass(frozen=True, slots=True)
 class ProcessedData:
-    sm_data: SynthetMicData
+    config: DiagramConfig
     generator: DiagramGenerator
-    phases: np.ndarray
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,10 +101,9 @@ class AlgorithmConfig:
     n_iter: int
     tol: float | None
     damp_param: float
-    verbose: bool = False
 
 
-def parse_box_dim(box: Box, dim: str) -> tuple[float, ...]:
+def parse_box_dim(box: Box, dim: str) -> Sequence[float]:
     box_dim = (box.length, box.breadth)
     if dim == Dimension.THREE_D:
         box_dim += (box.height,)
@@ -111,7 +111,7 @@ def parse_box_dim(box: Box, dim: str) -> tuple[float, ...]:
     return box_dim
 
 
-def parse_periodicity(p: Periodic, dim: str) -> tuple[bool, ...]:
+def parse_periodicity(p: Periodic, dim: str) -> Sequence[bool]:
     periodic = (p.is_x_periodic, p.is_y_periodic)
     if dim == Dimension.THREE_D:
         periodic += (p.is_z_periodic,)
@@ -126,7 +126,7 @@ def sample_single_phase_vols(
     space_dim: int,
     **kwargs,
 ) -> tuple[np.ndarray, np.ndarray]:
-    phases = np.zeros(n_grains)
+    phases = np.zeros(n_grains, dtype=int)
     match dist:
         case Distribution.CONSTANT:
             rel_vol = np.ones(n_grains) / n_grains
@@ -196,18 +196,20 @@ def sample_dual_phase_vols(
         axis=None,
     )
 
-    phases = np.concatenate([np.zeros(n_grains[0]), np.ones(n_grains[1])])
+    phases = np.concatenate(
+        [np.zeros(n_grains[0], dtype=int), np.ones(n_grains[1], dtype=int)]
+    )
 
     return volumes, phases
 
 
 def process_mesh(
-    mesh: pv.PolyData | pv.UnstructuredGrid,
+    mesh: pv.DataObject,
     target_volumes: np.ndarray | None,
     fitted_volumes: np.ndarray,
     phases: np.ndarray,
     colorby: str,
-) -> tuple[pv.PolyData | pv.UnstructuredGrid, tuple[float, float]]:
+) -> tuple[pv.DataObject, tuple[float, float]]:
     if colorby not in Colorby:
         raise ValueError(
             f"Invalid colorby: {colorby}. Value must be one of {', '.join(Colorby)}"
@@ -221,12 +223,15 @@ def process_mesh(
     else:
         errors = np.abs(fitted_volumes - target_volumes) * 100 / target_volumes
 
-    register = {
+    if phases.dtype != int:
+        _, phases = np.unique(phases, return_inverse=True)
+
+    register: dict[str, np.ndarray] = {
         Colorby.TARGET_VOLUMES: target_volumes,
         Colorby.FITTED_VOLUMES: fitted_volumes,
         Colorby.VOLUME_ERRORS: errors,
         Colorby.RANDOM: np.random.rand(fitted_volumes.shape[0]),
-        Colorby.PHASES: phases,
+        Colorby.PHASES: np.asarray(phases, dtype=float),
     }
 
     mesh.cell_data["vols"] = register[colorby][mesh.cell_data["num"].astype(int)]
@@ -268,16 +273,16 @@ class DiagramViewer:
 
         self._scalars = "vols"
         self._mesh = processed_data.generator.get_mesh()
-        self._volumes = processed_data.sm_data.volumes
+        self._volumes = processed_data.config.volumes
         self._fitted_volumes = processed_data.generator.get_fitted_volumes()
-        self._phases = self.processed_data.phases
+        self._phases = self.processed_data.config.phases
         self._centroids = processed_data.generator.get_centroids()
         self._positions = processed_data.generator.get_positions()
         self._vertices = processed_data.generator.get_vertices()
         self._weights = processed_data.generator.get_weights()
-        self._seeds = processed_data.sm_data.seeds
-        self._domain = processed_data.sm_data.domain
-        self._periodic = processed_data.sm_data.periodic
+        self._seeds = processed_data.config.seeds
+        self._domain = processed_data.config.domain
+        self._periodic = processed_data.config.periodic
 
         self._processed_mesh, self._clim = process_mesh(
             mesh=self._mesh,
@@ -492,7 +497,7 @@ class DiagramViewer:
             domain=omega,
         )
         if periodic is not None:
-            add_replicants(obj=pd, periodic=periodic, domain_lens=lens)
+            add_replicants(obj=pd, periodic=periodic, boxsize=lens)
 
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".vtk", delete=True
@@ -550,42 +555,9 @@ def generator_factory(config: AlgorithmConfig) -> DiagramGenerator:
         return VoronoiDiagramGenerator(
             n_iter=config.n_iter,
             damp_param=config.damp_param,
-            verbose=config.verbose,
         )
 
     return LaguerreDiagramGenerator(**asdict(config))
-
-
-class ShinyDiagramGenerator:
-    def __init__(self, config: AlgorithmConfig):
-        self.config = config
-        self._generator = generator_factory(config)
-
-    def progress_callback(self, msg: str) -> None:
-        self._value = min(self._value + 1, self._p.max)
-        self._p.set(value=self._value, message="Running...", detail=msg)
-
-    def init_pbar(self) -> None:
-        self._p = ui.Progress(
-            min=0,
-            max=max(self.config.n_iter, 1),
-        )
-        self._value = 0
-
-        self._p.set(value=self._p.min, message="Initialising...")
-        self._generator._print_msg = self.progress_callback
-
-    def close_pbar(self) -> None:
-        self._p.close()
-
-    def fit(self, data: SynthetMicData) -> DiagramGenerator:
-
-        if isinstance(self._generator, VoronoiDiagramGenerator):
-            return self._generator.fit(
-                seeds=data.seeds, domain=data.domain, periodic=data.periodic
-            )
-
-        return self._generator.fit(**asdict(data))
 
 
 def gt(rhs: float, allow_none: bool = False) -> Callable[[float | None], str | None]:
@@ -651,7 +623,7 @@ def between(
         return left <= x <= right
 
     return lambda x: (
-        None if (rule(x) or x is None) else f"Must be between {left} and {right}"
+        None if (x is None or rule(x)) else f"Must be between {left} and {right}"
     )
 
 
@@ -1089,12 +1061,12 @@ def create_example_data_bytes(name: str, file_extension: str) -> bytes:
                 )
                 register[file] = df
 
-            data = SynthetMicData(
+            data = DiagramConfig(
                 seeds=register["seeds"].values,
                 volumes=register["volumes"]["volumes"].values,
                 domain=np.array([[0, i] for i in register["dimension"].values[0]]),
                 periodic=None,
-                init_weights=None,
+                initial_weights=None,
             )
 
         case _:

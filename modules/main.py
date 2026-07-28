@@ -5,7 +5,8 @@ import pandas as pd
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 from shiny.types import FileInfo
 from shiny_validate import InputValidator
-from synthetmic.data.utils import SynthetMicData, sample_random_seeds
+from synthetmic import DiagramConfig, LaguerreEvent, VoronoiEvent
+from synthetmic.data.utils import sample_random_seeds
 
 from modules import common, laguerre, voronoi
 from shared import comps, utils, views
@@ -175,7 +176,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
 
             n_grains = input.n_grains()
             volumes = None
-            phases = np.zeros(n_grains)
+            phases = np.zeros(n_grains, dtype=int)
             tol = None
 
         if input.seeds_init() == SeedInitializer.RANDOM:
@@ -229,27 +230,41 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
                 )
                 return
 
-        config = utils.AlgorithmConfig(
+        views.busy_modal("Generating microstructure...sit back and relax.")
+
+        algorithm_config = utils.AlgorithmConfig(
             tol=tol,
             n_iter=input.n_iter(),
             damp_param=input.damp_param(),
-            verbose=False,
         )
-        sm_data = SynthetMicData(
+        diagram_config = DiagramConfig(
             domain=domain,
             seeds=seeds,
+            phases=phases,
             volumes=volumes,
-            periodic=list(periodic),
-            init_weights=None,
+            periodic=tuple(periodic),
+            initial_weights=None,
         )
-        sdg = utils.ShinyDiagramGenerator(config)
-        sdg.init_pbar()
-        generator = sdg.fit(sm_data)
-        sdg.close_pbar()
+        generator = utils.generator_factory(algorithm_config)
+
+        p = ui.Progress(min=0, max=algorithm_config.n_iter + 1)
+        p.set(value=0, message="Initialising...")
+
+        def callback(e: LaguerreEvent | VoronoiEvent) -> None:
+            p.set(
+                value=e.iteration,
+                message="Generating...",
+                detail=f"Finished {e.iteration} of {e.total}",
+            )
+
+        generator.fit(diagram_config, callback=callback)
+        p.close()
 
         _processed_data.set(
-            utils.ProcessedData(sm_data=sm_data, generator=generator, phases=phases)
+            utils.ProcessedData(config=diagram_config, generator=generator)
         )
+
+        ui.modal_remove()
 
     @reactive.effect
     @reactive.event(input.generate)

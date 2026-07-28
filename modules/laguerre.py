@@ -270,9 +270,13 @@ def volumes(
 
             if utils.PHASES in uploaded_volumes.columns:
                 phases = uploaded_volumes[utils.PHASES].values
+                if phases.dtype is float:
+                    return Exception(
+                        "Phases can only contain integer or string data type."
+                    )
 
             else:
-                phases = np.zeros_like(volumes)
+                phases = np.zeros_like(volumes, dtype=int)
 
             return volumes, phases
 

@@ -96,7 +96,7 @@ def server(
             add_final_seed_positions=input.add_final_seed_positions(),
         )
 
-        domain = d.sm_data.domain
+        domain = d.config.domain
 
         match input.view():
             case DiagramView.FULL:
@@ -190,10 +190,16 @@ def server(
     @reactive.effect
     def _():
         choices = list(Colorby)
+        selected = input.colorby()
+
         if input.view() == DiagramView.THRESHED:
             choices.remove(Colorby.RANDOM)
+            choices.remove(Colorby.PHASES)
 
-        ui.update_select(id="colorby", choices=choices, selected=input.colorby())
+            if input.colorby() in (Colorby.RANDOM, Colorby.PHASES):
+                selected = None
+
+        ui.update_select(id="colorby", choices=choices, selected=selected)
 
     @render.ui
     def slice_value_slider() -> ui.Tag | None:
@@ -201,7 +207,7 @@ def server(
         if not isinstance(d, utils.ProcessedData):
             return
 
-        domain = d.sm_data.domain
+        domain = d.config.domain
         coordinates = utils.COORDINATES[: len(domain)]
 
         if input.slice_normal() not in coordinates:
@@ -225,7 +231,7 @@ def server(
         if not isinstance(d, utils.ProcessedData):
             return
 
-        domain = d.sm_data.domain
+        domain = d.config.domain
         coordinates = utils.COORDINATES[: len(domain)]
 
         if input.clip_normal() not in coordinates:
@@ -247,12 +253,12 @@ def server(
         )
 
     @render.ui
-    def extra_opts() -> ui.Tag:
+    def extra_opts() -> ui.Tag | None:
         d = processed_data()
         if not isinstance(d, utils.ProcessedData):
             return
 
-        domain = d.sm_data.domain
+        domain = d.config.domain
 
         opts = ()
         match input.view():
