@@ -13,7 +13,6 @@ def sidebar(*args, **kwargs) -> ui.Sidebar:
         width=500,
         title=None,
         fillable=True,
-        bg="#f2f2f2",
         **kwargs,
     )
 
