@@ -1,13 +1,12 @@
-from dataclasses import asdict
 from itertools import product
 
 import numpy as np
 import pytest
-from synthetmic import LaguerreDiagramGenerator
+from synthetmic import DiagramConfig, LaguerreDiagramGenerator
 from synthetmic.data import toy
-from synthetmic.data.utils import SynthetMicData, create_constant_volumes
+from synthetmic.data.utils import create_constant_volumes
 
-from shared.utils import AlgorithmConfig, ShinyDiagramGenerator, calculate_num_vertices
+from shared.utils import calculate_num_vertices
 
 TEST_DATA = (
     (
@@ -43,15 +42,14 @@ def test_total_num_vertices(
     volumes = create_constant_volumes(n_grains=n_grains, domain_volume=domain_volume)
     periodic = [False] * space_dim
 
-    config = AlgorithmConfig(tol=1.0, n_iter=0, damp_param=1.0, verbose=False)
-    data = SynthetMicData(
+    data = DiagramConfig(
         seeds=seeds,
         domain=domain,
         volumes=volumes,
         periodic=periodic,
-        init_weights=None,
+        initial_weights=None,
     )
-    gen = ShinyDiagramGenerator(config).fit(data)
+    gen = LaguerreDiagramGenerator(tol=1.0, n_iter=0, damp_param=1.0).fit(data)
 
     grain_face_vertices = [v for v in gen.get_vertices().values()]
 
@@ -63,29 +61,3 @@ def test_total_num_vertices(
 
     assert sum(num_vertices_per_grain) == exp_num_vertices_per_grain
     assert num_unique_vertices == exp_num_unique_vertices
-
-
-@pytest.mark.parametrize("seeds", [td[0] for td in TEST_DATA])
-def test_period_consistency(seeds: np.ndarray) -> None:
-    n_grains, space_dim = seeds.shape
-    domain, domain_volume = toy.create_unit_domain(space_dim=space_dim)
-    volumes = create_constant_volumes(n_grains=n_grains, domain_volume=domain_volume)
-    periodic = [False] * space_dim
-    data = SynthetMicData(
-        seeds=seeds,
-        domain=domain,
-        volumes=volumes,
-        periodic=periodic,
-        init_weights=None,
-    )
-    config = AlgorithmConfig(tol=1.0, n_iter=0, damp_param=1.0, verbose=False)
-
-    pkg_generator = LaguerreDiagramGenerator(**asdict(config))
-    pkg_generator.fit(**asdict(data))
-    pkg_count = [len(v) for v in pkg_generator.get_vertices().values()]
-
-    gui_generator = ShinyDiagramGenerator(config).fit(data)
-    gui_count = [len(v) for v in gui_generator.get_vertices().values()]
-
-    assert len(pkg_count) == len(gui_count)
-    assert pkg_count == gui_count
