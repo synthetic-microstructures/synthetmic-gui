@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Sequence
 
 import pandas as pd
 from shiny import ui
@@ -9,7 +9,42 @@ from shared.consts import (
     APP_VERSION,
     Distribution,
 )
-from shared.utils import COORDINATES, VOLUMES
+from shared.utils import COORDINATES, PHASES, VOLUMES
+
+
+def busy_modal(msg: str) -> None:
+    ui.modal_show(
+        ui.modal(
+            ui.div(
+                {"class": "text-center p-4"},
+                ui.div({"class": "spinner-border text-primary"}),
+                ui.br(),
+                ui.p(msg),
+                ui.help_text("While waiting, please check the progress below."),
+            ),
+            easy_close=False,
+            footer=None,
+        )
+    )
+
+
+def no_processed_data_text() -> ui.Tag:
+    return ui.help_text(
+        ui.markdown(
+            """
+            No processed data detected. Please check help on how to use this
+            app on the **Home** page.
+            """
+        )
+    )
+
+
+def invert_switch(id: str = "invert") -> ui.Tag:
+    return ui.input_switch(
+        id=id,
+        label="Invert",
+        width="100%",
+    )
 
 
 def seeds_summary(seeds: pd.DataFrame | None, table_id: str) -> ui.Tag:
@@ -22,10 +57,10 @@ def seeds_summary(seeds: pd.DataFrame | None, table_id: str) -> ui.Tag:
 
 
 def app_version_text() -> ui.Tag:
-    return (ui.help_text(f"{APP_NAME} {APP_VERSION}"),)
+    return ui.help_text(f"{APP_NAME} {APP_VERSION}")
 
 
-def dist_selection(id: str, label: str = "Choose a volume distribution") -> ui.Tag:
+def dist_selection(id: str, label: str = "Volume distribution") -> ui.Tag:
     return comps.selection(
         id=id,
         label=label,
@@ -34,7 +69,9 @@ def dist_selection(id: str, label: str = "Choose a volume distribution") -> ui.T
     )
 
 
-def numeric_input(ids: list[str], labels: list[str], defaults: list[Any]) -> ui.Tag:
+def numeric_input(
+    ids: Sequence[str], labels: Sequence[str], defaults: Sequence[Any]
+) -> ui.Tag:
     width = 12 // len(ids)
     cols = [
         ui.column(
@@ -77,8 +114,10 @@ def grains_help_text() -> ui.HTML:
         and volume distribution for each phase. Note that each phase can have a different
         distribution.
 
-        If you choose to upload volumes instead, then the uploaded csv or txt file must have **only
-        one column** named '{VOLUMES}', and all its values must be float.
+        If you choose to upload volumes instead, then the uploaded csv or txt file must have
+        **at least one column** named '{VOLUMES}'. You can add an optional column named '{PHASES}',
+        which are non-negative integer labels, indicating the microstructure phases. For 
+        instance, a dual phase can have labels 0 and 1.
 
         We support three distributions: **constant**, **uniform**, and **lognormal**.
 
@@ -115,7 +154,7 @@ def algo_help_text() -> ui.HTML:
         {list(COORDINATES)} for 3D case. The columns are the coordinates of the seeds. All
         values must be float.
 
-        **Volume tolerance**: relative percentage error for volumes (for Laguerre diagram).
+        **Tolerance**: relative percentage error for areas or volumes (for Laguerre diagram).
 
         **Lloyd iterations**: number of iterations of Lloyd's algorithm (move each seed to the
         centroid of its cell).

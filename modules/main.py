@@ -5,8 +5,8 @@ import pandas as pd
 from shiny import Inputs, Outputs, Session, module, reactive, render, ui
 from shiny.types import FileInfo
 from shiny_validate import InputValidator
-from synthetmic.data.utils import SynthetMicData, sample_random_seeds
-from synthetmic.generate import DiagramGenerator
+from synthetmic import DiagramConfig, LaguerreEvent, VoronoiEvent
+from synthetmic.data.utils import sample_random_seeds
 
 from modules import common, laguerre, voronoi
 from shared import comps, utils, views
@@ -22,12 +22,12 @@ from shared.consts import (
 @module.ui
 def ui_():
     sidebar = comps.sidebar(
-        ui.tags.div(
+        ui.div(
             comps.group_ui_elements(
                 comps.selection(
                     id="diagram",
                     label="Choose a diagram type",
-                    choices=[d for d in DiagramType],
+                    choices=list(DiagramType),
                     selected=DiagramType.LAGUERRE,
                 ),
                 title="Diagram",
@@ -37,7 +37,7 @@ def ui_():
                 comps.selection(
                     id="dim",
                     label="Choose a dimension",
-                    choices=[d for d in Dimension],
+                    choices=list(Dimension),
                     selected=Dimension.THREE_D,
                 ),
                 ui.output_ui("box_dim"),
@@ -55,12 +55,12 @@ def ui_():
                 comps.selection(
                     id="seeds_init",
                     label="Choose how seeds are initialized",
-                    choices=[i for i in SeedInitializer],
+                    choices=list(SeedInitializer),
                     selected=SeedInitializer.RANDOM,
                 ),
                 ui.panel_conditional(
                     f"input.seeds_init === '{SeedInitializer.RANDOM}'",
-                    ui.tags.div(
+                    ui.div(
                         ui.input_numeric(
                             id="random_state",
                             label="Seeds random state",
@@ -73,7 +73,7 @@ def ui_():
                 ),
                 ui.panel_conditional(
                     f"input.seeds_init === '{SeedInitializer.UPLOAD}'",
-                    ui.tags.div(
+                    ui.div(
                         comps.upload_handler(
                             "uploaded_seeds",
                             "Uplaod seeds as a csv or txt file",
@@ -88,9 +88,9 @@ def ui_():
             comps.input_task_button(
                 id="generate",
                 label="Generate microstructure",
-                icon="person-running",
+                icon="arrow-right",
             ),
-            ui.hr(),
+            ui.p(),
             views.app_version_text(),
         ),
         id="sidebar",
@@ -108,6 +108,7 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
 
     _uploaded_seeds = reactive.Value(value=None)
     _uploaded_volumes = reactive.Value(value=None)
+    _processed_data = reactive.Value(value=None)
 
     @reactive.effect
     def _() -> None:
@@ -122,15 +123,16 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         if file is not None:
             _uploaded_volumes.set(pd.read_csv(file[0]["datapath"]))
 
-    @reactive.calc
+    @reactive.effect
     @reactive.event(input.generate)
-    def _fit() -> tuple[SynthetMicData, DiagramGenerator] | Exception:
+    def _() -> None:
         if input.dim() == Dimension.THREE_D:
             iv.add_rule("height", utils.req_gt(rhs=0))
 
         iv.enable()
         if not iv.is_valid():
-            return Exception(views.invalid_input_text())
+            _processed_data.set(Exception(views.invalid_input_text()))
+            return
 
         box_dim = utils.parse_box_dim(
             utils.Box(
@@ -150,16 +152,18 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         )
 
         if input.diagram() == DiagramType.LAGUERRE:
-            volumes = laguerre.volumes(
+            out = laguerre.volumes(
                 input=input,
                 iv=iv,
                 domain_vol=np.prod(box_dim),
                 space_dim=space_dim,
                 uploaded_volumes=_uploaded_volumes(),
             )
-            if isinstance(volumes, Exception):
-                return volumes
+            if isinstance(out, Exception):
+                _processed_data.set(out)
+                return
 
+            volumes, phases = out
             n_grains = len(volumes)
             tol = input.tol()
 
@@ -167,20 +171,25 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             iv.add_rule("n_grains", utils.req_int_gt(rhs=0))
             iv.enable()
             if not iv.is_valid():
-                return Exception(views.invalid_input_text())
+                _processed_data.set(Exception(views.invalid_input_text()))
+                return
 
-            volumes = None
-            tol = None
             n_grains = input.n_grains()
+            volumes = None
+            phases = np.zeros(n_grains, dtype=int)
+            tol = None
 
         if input.seeds_init() == SeedInitializer.RANDOM:
             iv.add_rule("random_state", utils.int_gte(rhs=0, allow_none=True))
             iv.enable()
 
             if not iv.is_valid():
-                return Exception(
-                    "Invalid random seed. Please check your input and try again."
+                _processed_data.set(
+                    Exception(
+                        "Invalid random seed. Please check your input and try again."
+                    )
                 )
+                return
 
             seeds = sample_random_seeds(
                 domain=domain,
@@ -191,38 +200,71 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
         else:
             seeds = _uploaded_seeds()
             if seeds is None:
-                return Exception("Seeds not uploaded. Upload seeds and try again.")
+                _processed_data.set(
+                    Exception("Seeds not uploaded. Upload seeds and try again.")
+                )
+                return
 
-            val_out = utils.validate_df(
+            coords = list(utils.COORDINATES)[:space_dim]
+            res = utils.validate_upload(
                 seeds,
-                expected_colnames=list(utils.COORDINATES)[:space_dim],
+                expected_colnames=coords,
                 expected_dim=(n_grains, space_dim),
-                expected_type="float",
                 file="seeds",
-                bounds=dict(zip(utils.COORDINATES[:space_dim], domain)),
+                bounds=dict(zip(coords, domain)),
             )
-            if isinstance(val_out, str):
-                return Exception(val_out)
+            if isinstance(res, Exception):
+                _processed_data.set(res)
+                return
 
-            seeds = seeds.values
+            seeds = seeds[coords].values
 
         # In case of Laguerre, check if len of volumes and seeds match
         if input.diagram() == DiagramType.LAGUERRE:
             if len(volumes) != len(seeds):
-                return Exception(
-                    f"""The number of samples in seeds and grain volumes do not match:
+                _processed_data.set(
+                    Exception(
+                        f"""The number of samples in seeds and grain volumes do not match:
                   len(seeds)={len(seeds)}, len(volumes)={len(volumes)}"""
+                    )
                 )
+                return
 
-        return utils.fit(
-            domain=domain,
-            seeds=seeds,
-            volumes=volumes,
-            periodic=list(periodic),
+        views.busy_modal("Generating microstructure...sit back and relax.")
+
+        algorithm_config = utils.AlgorithmConfig(
             tol=tol,
             n_iter=input.n_iter(),
             damp_param=input.damp_param(),
         )
+        diagram_config = DiagramConfig(
+            domain=domain,
+            seeds=seeds,
+            phases=phases,
+            volumes=volumes,
+            periodic=tuple(periodic),
+            initial_weights=None,
+        )
+        generator = utils.generator_factory(algorithm_config)
+
+        p = ui.Progress(min=0, max=algorithm_config.n_iter + 1)
+        p.set(value=0, message="Initialising...")
+
+        def callback(e: LaguerreEvent | VoronoiEvent) -> None:
+            p.set(
+                value=e.iteration,
+                message="Generating...",
+                detail=f"Finished {e.iteration} of {e.total}",
+            )
+
+        generator.fit(diagram_config, callback=callback)
+        p.close()
+
+        _processed_data.set(
+            utils.ProcessedData(config=diagram_config, generator=generator)
+        )
+
+        ui.modal_remove()
 
     @reactive.effect
     @reactive.event(input.generate)
@@ -254,22 +296,21 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
     def periodicity() -> ui.Tag:
         space_dim = 2 if input.dim() == Dimension.TWO_D else 3
         ids = [f"is_{c}_periodic" for c in utils.COORDINATES[:space_dim]]
-        labels = [f"{c}-coordinate" for c in utils.COORDINATES[:space_dim]]
 
-        return ui.tags.div(
+        return ui.div(
             ui.markdown("Periodicity"),
-            views.periodic_input(ids, labels),
+            views.periodic_input(ids, utils.COORDINATES[:space_dim]),
         )
 
     @render.ui
     def algorithm() -> ui.Tag:
         ids = ("n_iter", "damp_param")
-        labels = ("Lloyd iterations", "Damp param")
+        labels = ("Lloyd iterations", "Damp parameter")
         defaults = (5, 1.0)
 
         if input.diagram() == DiagramType.LAGUERRE:
             ids += ("tol",)
-            labels += ("Volume tolerance",)
+            labels += ("Tolerance",)
             defaults += (1.0,)
 
         return views.numeric_input(ids=ids, labels=labels, defaults=defaults)
@@ -356,12 +397,4 @@ def server(input: Inputs, output: Outputs, session: Session) -> None:
             if msg:
                 return " ".join(msg)
 
-    @reactive.effect
-    @reactive.event(input.generate)
-    def _():
-        f = _fit()
-        if isinstance(f, Exception):
-            comps.error_notification(str(f))
-
-        else:
-            common.server("common", f, input.generate)
+    common.server("common", _processed_data)

@@ -10,6 +10,7 @@ page_dependencies = ui.head_content(
     ui.tags.link(rel="stylesheet", type="text/css", href="layout.css"),
     ui.tags.link(rel="stylesheet", type="text/css", href="style.css"),
     ui.tags.style(styles.popover),
+    ui.busy_indicators.use(spinners=True, pulse=False, fade=True),
     ui.HTML(Path(Path(__file__).parent, "www", "ga", "analytics.html").read_text()),
 )
 
@@ -41,4 +42,5 @@ app = App(
     app_ui,
     server,
     static_assets={"/": Path(__file__).parent / "www"},
+    debug=False,
 )

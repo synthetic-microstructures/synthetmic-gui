@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 import faicons as fa
 from shiny import ui
@@ -10,7 +10,7 @@ def sidebar(*args, **kwargs) -> ui.Sidebar:
     return ui.sidebar(
         *args,
         position="left",
-        width=560,
+        width=500,
         title=None,
         fillable=True,
         **kwargs,
@@ -27,12 +27,14 @@ def download_button(id: str, label: str, icon: str = "download") -> ui.Tag:
     )
 
 
-def input_action_button(id: str, label: str, icon: str) -> ui.Tag:
+def input_action_button(
+    id: str, label: str, icon: str, width: str | None = "100%"
+) -> ui.Tag:
     return ui.input_action_button(
         id=id,
         label=label,
         icon=fa.icon_svg(icon),
-        width="100%",
+        width=width,
         class_="btn btn-primary",
     )
 
@@ -47,14 +49,15 @@ def input_task_button(id: str, label: str, icon: str) -> ui.Tag:
     )
 
 
-def error_notification(msg: str) -> None:
+def show_notification(
+    msg: str, type_: Literal["default", "message", "error", "warning"] = "default"
+) -> None:
     ui.notification_show(
         msg,
-        type="error",
-        duration=5,
+        duration=10,
+        close_button=True,
+        type=type_,
     )
-
-    return None
 
 
 def selection(

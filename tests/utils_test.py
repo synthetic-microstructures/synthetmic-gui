@@ -2,11 +2,11 @@ from itertools import product
 
 import numpy as np
 import pytest
-from synthetmic import LaguerreDiagramGenerator
+from synthetmic import DiagramConfig, LaguerreDiagramGenerator
 from synthetmic.data import toy
 from synthetmic.data.utils import create_constant_volumes
 
-from shared.utils import calculate_num_vertices, fit
+from shared.utils import calculate_num_vertices
 
 TEST_DATA = (
     (
@@ -36,25 +36,20 @@ TEST_DATA = (
 def test_total_num_vertices(
     seeds: np.ndarray, exp_num_vertices_per_grain: int, exp_num_unique_vertices: int
 ) -> None:
-    tol = 1.0
-    n_iter = 0
-    damp_param = 1.0
 
     n_grains, space_dim = seeds.shape
-    domain, domain_volume = toy._create_unit_domain(space_dim=space_dim)
+    domain, domain_volume = toy.create_unit_domain(space_dim=space_dim)
     volumes = create_constant_volumes(n_grains=n_grains, domain_volume=domain_volume)
-
     periodic = [False] * space_dim
 
-    _, gen = fit(
-        domain=domain,
+    data = DiagramConfig(
         seeds=seeds,
+        domain=domain,
         volumes=volumes,
         periodic=periodic,
-        tol=tol,
-        n_iter=n_iter,
-        damp_param=damp_param,
+        initial_weights=None,
     )
+    gen = LaguerreDiagramGenerator(tol=1.0, n_iter=0, damp_param=1.0).fit(data)
 
     grain_face_vertices = [v for v in gen.get_vertices().values()]
 
@@ -66,39 +61,3 @@ def test_total_num_vertices(
 
     assert sum(num_vertices_per_grain) == exp_num_vertices_per_grain
     assert num_unique_vertices == exp_num_unique_vertices
-
-    return None
-
-
-@pytest.mark.parametrize("seeds", [td[0] for td in TEST_DATA])
-def test_period_consistency(seeds: np.ndarray) -> None:
-    tol = 1.0
-    n_iter = 0
-    damp_param = 1.0
-
-    n_grains, space_dim = seeds.shape
-    domain, domain_volume = toy._create_unit_domain(space_dim=space_dim)
-    volumes = create_constant_volumes(n_grains=n_grains, domain_volume=domain_volume)
-    periodic = [False] * space_dim
-
-    pkg_generator = LaguerreDiagramGenerator(
-        tol=tol, n_iter=n_iter, damp_param=damp_param, verbose=True
-    )
-    pkg_generator.fit(seeds=seeds, volumes=volumes, domain=domain, periodic=periodic)
-    pkg_count = [len(v) for v in pkg_generator.get_vertices().values()]
-
-    _, gui_generator = fit(
-        domain=domain,
-        seeds=seeds,
-        volumes=volumes,
-        periodic=periodic,
-        tol=tol,
-        n_iter=n_iter,
-        damp_param=damp_param,
-    )
-    gui_count = [len(v) for v in gui_generator.get_vertices().values()]
-
-    assert len(pkg_count) == len(gui_count)
-    assert pkg_count == gui_count
-
-    return None
